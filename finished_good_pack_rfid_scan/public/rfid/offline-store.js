@@ -18,9 +18,12 @@
       return await new Promise((resolve, reject) => {
         const tx = db.transaction(table, mode);
         const request = action(tx.objectStore(table));
-        request.onsuccess = () => resolve(request.result);
+        let result;
+        request.onsuccess = () => { result = request.result; };
         request.onerror = () => reject(request.error);
+        tx.oncomplete = () => resolve(result);
         tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
       });
     } finally { db.close(); }
   };

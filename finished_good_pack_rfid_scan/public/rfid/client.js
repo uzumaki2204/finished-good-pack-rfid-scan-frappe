@@ -143,8 +143,9 @@
       sessionCards('history-list', history.items, 'ui.empty_history');
     } catch (error) {
       if (!navigator.onLine) {
-        const cached = (await store.all('sessions')).filter(s => s.deviceId === state.device.id && s.sessionStatus === 'Active');
-        sessionCards('active-list', cached, 'ui.empty_sessions');
+        const cached = (await store.all('sessions')).filter(s => s.deviceId === state.device.id);
+        sessionCards('active-list', cached.filter(s => s.sessionStatus === 'Active'), 'ui.empty_sessions');
+        sessionCards('history-list', cached.filter(s => s.sessionStatus === 'Completed'), 'ui.empty_history');
       } else explain(error);
     }
   };

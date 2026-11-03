@@ -1,7 +1,9 @@
 (() => {
   'use strict';
   const catalog = window.FinishedGoodRfidCatalog || {};
-  let language = localStorage.getItem('finished_good_rfid_language') || document.documentElement.lang || 'vi';
+  let savedLanguage;
+  try { savedLanguage = localStorage.getItem('finished_good_rfid_language'); } catch { savedLanguage = null; }
+  let language = savedLanguage || document.documentElement.lang || 'vi';
   if (!catalog[language]) language = 'vi';
   const text = (key, values = {}) => {
     const template = (catalog[language] || {})[key] || (catalog.vi || {})[key];
@@ -16,7 +18,7 @@
   const setLanguage = value => {
     if (!catalog[value]) return;
     language = value;
-    localStorage.setItem('finished_good_rfid_language', value);
+    try { localStorage.setItem('finished_good_rfid_language', value); } catch { /* Language still changes for this page. */ }
     render();
     document.dispatchEvent(new CustomEvent('rfid:language'));
   };
