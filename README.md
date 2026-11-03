@@ -18,7 +18,7 @@ Yêu cầu: Frappe `>=16.53,<17`, `factory_management >=0.1.76,<0.2`.
 
 1. Thêm repository và branch trên Pilot; cài app vào site đã có `factory_management`.
 2. Chạy migration qua quy trình Pilot. `bench migrate` đồng bộ DocType, Module Def và chạy patch `v0_1_0_setup` để tạo trang tablet và index. Không sửa trực tiếp trên máy chủ.
-3. Gán vai trò **RFID Scan Manager** hoặc **RFID Scan Operator** cho người dùng Desk; manager tạo **RFID SOAP Account** theo Company và nhập URL, username, password trên Frappe.
+3. Biểu tượng app hiện cho người dùng đã đăng nhập Desk. Gán vai trò **RFID Scan Manager** hoặc **RFID Scan Operator** để xem các DocType tương ứng; manager tạo **RFID SOAP Account** theo Company và nhập URL, username, password trên Frappe.
 4. Tạo và duyệt thiết bị trong **Factory Device**; mở trang tablet trên HTTPS, nhập hoặc quét ID thiết bị Frappe.
 5. Nghiệm thu: chọn nhiều booking → xem xung đột → tạo phiên → scan RFID (có thể offline) → kết nối lại → hoàn thành → xem lịch sử.
 

@@ -6,11 +6,8 @@ from finished_good_pack_rfid_scan.errors import RfidError
 
 
 def can_open():
-    user = frappe.session.user
-    if user == "Guest":
-        return False
-    roles = set(frappe.get_roles(user))
-    return bool(roles & {"System Manager", "RFID Scan Manager", "RFID Scan Operator"})
+    """The Desk shortcut is visible to signed-in users; tablet operations check Factory Device separately."""
+    return frappe.session.user != "Guest"
 
 
 def approved_device(device_id):
