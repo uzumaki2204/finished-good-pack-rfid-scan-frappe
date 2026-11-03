@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "finished_good_pack_rfid_scan"
-version = "0.1.4"
+version = "0.1.5"
 description = "Finished good pack RFID scanning for Frappe 16"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -20,7 +20,7 @@ include = ["finished_good_pack_rfid_scan*"]
 
 [tool.setuptools.package-data]
 finished_good_pack_rfid_scan = [
-    "*.txt", "*.json", "*.html", "public/rfid/*.js", "public/rfid/*.json", "public/rfid/*.svg",
+    "*.txt", "*.json", "*.html", "public/rfid/*.js", "public/rfid/*.json", "public/rfid/*.svg", "public/rfid/*.png",
     "templates/*.html", "templates/includes/*.html", "www/*.js",
     "finished_good_pack_rfid_scan/doctype/*/*.json", "translations/*.csv",
 ]

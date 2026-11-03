@@ -7,6 +7,7 @@
   const normalized = value => String(value || '').trim().toUpperCase();
   const value = id => $(id).value.trim();
   const show = (id, visible) => { $(id).hidden = !visible; };
+  const expandPageShell = () => $('rfid-app')?.closest('body > div')?.classList.add('w-100');
   const notice = (key, kind = 'info', values = {}) => {
     const node = $('notice');
     node.className = `alert alert-${kind}`;
@@ -40,8 +41,12 @@
   };
   const renderNetwork = () => {
     const node = $('network-status');
-    node.className = `indicator-pill ${navigator.onLine ? 'green' : 'orange'} mr-2`;
-    node.textContent = i18n.text(navigator.onLine ? 'ui.online' : 'ui.offline');
+    const key = navigator.onLine ? 'ui.online' : 'ui.offline';
+    const label = i18n.text(key);
+    node.className = `${navigator.onLine ? 'text-success' : 'text-danger'} mr-2`;
+    node.setAttribute('aria-label', label);
+    node.title = label;
+    $('network-status-label').textContent = label;
   };
   const renderDeviceInfo = () => {
     const badge = $('device-status-badge');
@@ -247,9 +252,8 @@
     } catch { stopCamera(); notice('error.camera_failed', 'danger'); }
   };
   const init = async () => {
-    i18n.render(); $('language').value = i18n.language; renderNetwork();
-    $('language').onchange = event => i18n.setLanguage(event.target.value);
-    document.addEventListener('rfid:language', () => { renderNetwork(); renderDeviceInfo(); if (state.session) renderSession(); else if (state.device) loadHome(); });
+    expandPageShell();
+    i18n.render(); renderNetwork();
     window.addEventListener('online', renderNetwork); window.addEventListener('offline', renderNetwork);
     $('activate-device').onclick = () => activate(value('device-id'));
     $('check-device').onclick = () => activate(value('device-id'));

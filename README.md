@@ -1,6 +1,6 @@
 # Finished Good Pack RFID Scan for Frappe 16
 
-App độc lập cho quét RFID thành phẩm theo booking. Module **Finished Good Pack RFID Scan** xuất hiện trong Desk; trang `/finished-good-pack-rfid-scan` bố trí một cột cho điện thoại và dùng class Desk/Bootstrap mặc định của Frappe, không có CSS riêng. Patch cập nhật HTML của Web Page khi nâng cấp app.
+App độc lập cho quét RFID thành phẩm theo booking. Module **Finished Good Pack RFID Scan** xuất hiện trong Desk; trang `/finished-good-pack-rfid-scan` bố trí một cột giữa màn hình trên điện thoại, có logo và nút header dạng icon. Giao diện dùng class Desk/Bootstrap mặc định của Frappe, không có CSS riêng. Patch cập nhật HTML của Web Page khi nâng cấp app.
 
 ## Phạm vi dữ liệu
 
@@ -17,7 +17,7 @@ Branch: `version-16`.
 Yêu cầu: Frappe `>=16.53,<17`, `factory_management >=0.1.76,<0.2`.
 
 1. Thêm repository và branch vào **bench** trên Pilot, sau đó chọn **Install App** cho đúng **site** đang mở Desk. Chỉ có file trong `/assets/` nghĩa là mã đã có trên bench, chưa chứng minh app đã cài vào site.
-2. Chạy migration qua quy trình Pilot. `bench migrate` đồng bộ DocType, Module Def và chạy patch `v0_1_0_setup` để tạo trang tablet và index. Không sửa trực tiếp trên máy chủ.
+2. Chạy migration qua quy trình Pilot. `bench migrate` đồng bộ DocType, Module Def và chạy patch để tạo hoặc cập nhật HTML trang tablet; bản `0.1.5` thêm patch `v0_1_5_sync_mobile_header`. Không sửa trực tiếp trên máy chủ.
 3. Biểu tượng app hiện cho người dùng đã đăng nhập Desk. Gán vai trò **RFID Scan Manager** hoặc **RFID Scan Operator** để xem các DocType tương ứng; manager tạo **RFID SOAP Account** theo Company và nhập URL, username, password trên Frappe.
 4. Tạo và duyệt thiết bị trong **Factory Device**; mở trang tablet trên HTTPS, nhập hoặc quét ID thiết bị Frappe.
 5. Nghiệm thu: chọn nhiều booking → xem xung đột → tạo phiên → scan RFID (có thể offline) → kết nối lại → hoàn thành → xem lịch sử.

@@ -1,12 +1,19 @@
 <main id="rfid-app" class="container-fluid py-3">
   <div class="row justify-content-center">
     <div class="col-12 col-sm-11 col-md-10 col-lg-8 col-xl-7">
-      <header class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-        <h1 class="h5 mb-2" data-i18n="ui.title"></h1>
-        <div class="d-flex align-items-center mb-2">
-          <span id="network-status" class="indicator-pill mr-2" role="status" aria-live="polite"></span>
-          <label class="sr-only" for="language" data-i18n="ui.lang"></label>
-          <select id="language" class="form-control form-control-sm" data-i18n-aria="ui.lang"><option value="vi" data-i18n="ui.language_vi"></option><option value="en" data-i18n="ui.language_en"></option></select>
+      <header class="d-flex align-items-center justify-content-between mb-3">
+        <div class="d-flex align-items-center">
+          <img src="/assets/finished_good_pack_rfid_scan/rfid/logo.png" class="bg-white rounded mr-2" width="44" height="44" alt="">
+          <h1 class="h5 mb-0" data-i18n="ui.title"></h1>
+        </div>
+        <div class="d-flex align-items-center">
+          <span id="network-status" class="text-success mr-2" role="status" aria-live="polite" data-i18n-aria="ui.online">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0"></path><path d="M5 12a10 10 0 0 1 14 0"></path><path d="M8.5 15.5a5 5 0 0 1 7 0"></path><path d="M12 19h.01"></path></svg>
+            <span id="network-status-label" class="sr-only"></span>
+          </span>
+          <button id="change-device" type="button" class="btn btn-default btn-sm" data-i18n-aria="ui.clear_device" data-i18n-title="ui.clear_device">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2"></rect><path d="M10 5.5h4M11 18.5h2"></path></svg>
+          </button>
         </div>
       </header>
       <div id="notice" class="alert" role="status" aria-live="polite" hidden></div>
@@ -52,10 +59,7 @@
 
       <section id="home-view" hidden>
         <div class="frappe-card p-3 mb-3">
-          <div class="d-flex flex-wrap justify-content-between align-items-center">
-            <h2 class="h5" data-i18n="ui.device"></h2>
-            <button id="change-device" class="btn btn-default btn-sm" type="button" data-i18n="ui.clear_device"></button>
-          </div>
+          <h2 class="h5" data-i18n="ui.device"></h2>
           <p id="device-summary" class="text-muted text-break"></p>
           <div class="row">
             <div class="col-md-6 form-group"><label for="vehicle" data-i18n="ui.vehicle"></label><input id="vehicle" class="form-control"></div>
