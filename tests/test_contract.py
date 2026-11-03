@@ -33,7 +33,10 @@ class ContractTest(unittest.TestCase):
         html = (PACKAGE / "templates" / "includes" / "tablet_head.html").read_text(encoding="utf-8")
         self.assertIn("desk.bundle.css", html)
         self.assertNotIn("site.css", html)
-        self.assertIn("v0_1_0_setup", (PACKAGE / "patches.txt").read_text(encoding="utf-8"))
+        patches = (PACKAGE / "patches.txt").read_text(encoding="utf-8")
+        self.assertIn("[pre_model_sync]", patches)
+        self.assertIn("[post_model_sync]", patches)
+        self.assertIn("v0_1_0_setup", patches)
 
 
 if __name__ == "__main__":

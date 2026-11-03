@@ -16,13 +16,15 @@ Repository: `finished-good-pack-rfid-scan-frappe`.
 Branch: `version-16`.
 Yêu cầu: Frappe `>=16.53,<17`, `factory_management >=0.1.76,<0.2`.
 
-1. Thêm repository và branch trên Pilot; cài app vào site đã có `factory_management`.
+1. Thêm repository và branch vào **bench** trên Pilot, sau đó chọn **Install App** cho đúng **site** đang mở Desk. Chỉ có file trong `/assets/` nghĩa là mã đã có trên bench, chưa chứng minh app đã cài vào site.
 2. Chạy migration qua quy trình Pilot. `bench migrate` đồng bộ DocType, Module Def và chạy patch `v0_1_0_setup` để tạo trang tablet và index. Không sửa trực tiếp trên máy chủ.
 3. Biểu tượng app hiện cho người dùng đã đăng nhập Desk. Gán vai trò **RFID Scan Manager** hoặc **RFID Scan Operator** để xem các DocType tương ứng; manager tạo **RFID SOAP Account** theo Company và nhập URL, username, password trên Frappe.
 4. Tạo và duyệt thiết bị trong **Factory Device**; mở trang tablet trên HTTPS, nhập hoặc quét ID thiết bị Frappe.
 5. Nghiệm thu: chọn nhiều booking → xem xung đột → tạo phiên → scan RFID (có thể offline) → kết nối lại → hoàn thành → xem lịch sử.
 
 Không đưa thông tin đăng nhập SOAP, SQL hoặc SSH vào GitHub, OpenAPI hay Postman collection. Dữ liệu phiên .NET trước đây tiếp tục xem trên ứng dụng cũ.
+
+Nếu Desk chưa hiện biểu tượng, kiểm tra **Installed Apps** của đúng site trong Pilot. App phải có tên `finished_good_pack_rfid_scan` và trang `/finished-good-pack-rfid-scan` phải mở được. Nếu API báo `App finished_good_pack_rfid_scan is not installed`, hãy dùng bước **Install App** trên site; thao tác **Update App** trên bench chưa đủ.
 
 ## Luồng API
 
