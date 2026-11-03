@@ -1,6 +1,6 @@
 # Finished Good Pack RFID Scan for Frappe 16
 
-App độc lập cho quét RFID thành phẩm theo booking. Module **Finished Good Pack RFID Scan** xuất hiện trong Desk; trang tablet là `/finished-good-pack-rfid-scan` và dùng `desk.bundle.css` mặc định của Frappe, không có CSS riêng.
+App độc lập cho quét RFID thành phẩm theo booking. Module **Finished Good Pack RFID Scan** xuất hiện trong Desk; trang `/finished-good-pack-rfid-scan` bố trí một cột cho điện thoại và dùng class Desk/Bootstrap mặc định của Frappe, không có CSS riêng. Patch cập nhật HTML của Web Page khi nâng cấp app.
 
 ## Phạm vi dữ liệu
 

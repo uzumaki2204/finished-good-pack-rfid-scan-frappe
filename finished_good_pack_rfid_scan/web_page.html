@@ -1,81 +1,103 @@
 <main id="rfid-app" class="container-fluid py-3">
-  <header class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-    <h1 class="h4 mb-2" data-i18n="ui.title"></h1>
-    <div class="d-flex align-items-center mb-2">
-      <span id="network-status" class="indicator-pill mr-2" role="status" aria-live="polite"></span>
-      <label class="sr-only" for="language" data-i18n="ui.lang"></label>
-      <select id="language" class="form-control form-control-sm" data-i18n-aria="ui.lang"><option value="vi" data-i18n="ui.language_vi"></option><option value="en" data-i18n="ui.language_en"></option></select>
-    </div>
-  </header>
-  <div id="notice" class="alert" role="status" aria-live="polite" hidden></div>
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-11 col-md-10 col-lg-8 col-xl-7">
+      <header class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+        <h1 class="h5 mb-2" data-i18n="ui.title"></h1>
+        <div class="d-flex align-items-center mb-2">
+          <span id="network-status" class="indicator-pill mr-2" role="status" aria-live="polite"></span>
+          <label class="sr-only" for="language" data-i18n="ui.lang"></label>
+          <select id="language" class="form-control form-control-sm" data-i18n-aria="ui.lang"><option value="vi" data-i18n="ui.language_vi"></option><option value="en" data-i18n="ui.language_en"></option></select>
+        </div>
+      </header>
+      <div id="notice" class="alert" role="status" aria-live="polite" hidden></div>
 
-  <section id="device-view" class="frappe-card p-3 mb-3">
-    <h2 class="h5" data-i18n="ui.device"></h2>
-    <div class="row">
-      <div class="col-md-5 form-group">
-        <label for="device-id" data-i18n="ui.device_id"></label>
-        <input id="device-id" class="form-control" autocomplete="off" spellcheck="false">
-      </div>
-      <div class="col-md-7 form-group d-flex align-items-end">
-        <button id="activate-device" type="button" class="btn btn-primary mr-2" data-i18n="ui.activate"></button>
-        <button id="scan-qr" type="button" class="btn btn-default" data-i18n="ui.scan_qr"></button>
-      </div>
-    </div>
-    <video id="qr-video" class="w-100 border rounded mb-2" playsinline muted hidden></video>
-    <p id="camera-status" class="text-muted" data-i18n="ui.camera_idle"></p>
-  </section>
+      <section id="device-view">
+        <div class="frappe-card p-3 mb-3">
+          <span id="device-status-badge" class="indicator-pill orange" data-i18n="ui.device_not_activated"></span>
+          <h2 class="h5 mt-2 mb-0" data-i18n="ui.shared_device_qr"></h2>
+        </div>
 
-  <section id="home-view" hidden>
-    <div class="frappe-card p-3 mb-3">
-      <div class="d-flex flex-wrap justify-content-between align-items-center">
-        <h2 class="h5" data-i18n="ui.device"></h2>
-        <button id="change-device" class="btn btn-default btn-sm" type="button" data-i18n="ui.clear_device"></button>
-      </div>
-      <p id="device-summary" class="text-muted"></p>
-      <div class="row">
-        <div class="col-md-6 form-group"><label for="vehicle" data-i18n="ui.vehicle"></label><input id="vehicle" class="form-control"></div>
-        <div class="col-md-6 form-group"><label for="driver" data-i18n="ui.driver"></label><input id="driver" class="form-control"></div>
-      </div>
-      <div class="form-group"><label for="booking-ids" data-i18n="ui.booking_ids"></label><textarea id="booking-ids" class="form-control" rows="3" aria-describedby="booking-hint"></textarea><small id="booking-hint" class="text-muted" data-i18n="ui.booking_hint"></small></div>
-      <button id="start-session" type="button" class="btn btn-primary" data-i18n="ui.start"></button>
-    </div>
-    <div class="row">
-      <section class="col-lg-6 mb-3"><div class="frappe-card p-3"><div class="d-flex justify-content-between"><h2 class="h5" data-i18n="ui.active"></h2><button id="refresh-active" type="button" class="btn btn-default btn-sm" data-i18n="ui.refresh"></button></div><div id="active-list"></div></div></section>
-      <section class="col-lg-6 mb-3"><div class="frappe-card p-3"><div class="d-flex justify-content-between"><h2 class="h5" data-i18n="ui.history"></h2><button id="refresh-history" type="button" class="btn btn-default btn-sm" data-i18n="ui.refresh"></button></div><div id="history-list"></div></div></section>
-    </div>
-  </section>
+        <div class="frappe-card p-3 mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-2" data-i18n="ui.qr_device"></h2>
+            <button id="scan-qr" type="button" class="btn btn-default mb-2" data-i18n="ui.camera_enable"></button>
+          </div>
+          <div class="embed-responsive embed-responsive-16by9 bg-dark rounded">
+            <video id="qr-video" class="embed-responsive-item bg-dark" width="640" height="360" playsinline muted data-i18n-aria="ui.camera_view"></video>
+          </div>
+          <p id="camera-status" class="text-muted mt-2 mb-3" data-i18n="ui.camera_idle" role="status" aria-live="polite"></p>
 
-  <section id="session-view" hidden>
-    <div class="frappe-card p-3 mb-3">
-      <div class="d-flex flex-wrap justify-content-between align-items-center">
-        <h2 id="session-title" class="h5"></h2>
-        <button id="back-home" type="button" class="btn btn-default btn-sm" data-i18n="ui.history"></button>
-      </div>
-      <p id="session-summary" class="text-muted"></p>
-      <div id="session-warnings" class="alert alert-warning" hidden></div>
-      <div class="row">
-        <div class="col-md-6 form-group"><label for="session-vehicle" data-i18n="ui.vehicle"></label><input id="session-vehicle" class="form-control"></div>
-        <div class="col-md-6 form-group"><label for="session-driver" data-i18n="ui.driver"></label><input id="session-driver" class="form-control"></div>
-      </div>
-      <div class="form-group"><label for="session-note" data-i18n="ui.note"></label><textarea id="session-note" class="form-control" rows="2"></textarea></div>
-      <div id="scan-controls" class="row">
-        <div class="col-md-9 form-group"><label for="rfid-input" data-i18n="ui.scan_rfid"></label><input id="rfid-input" class="form-control" autocomplete="off" spellcheck="false"></div>
-        <div class="col-md-3 form-group d-flex align-items-end"><button id="add-scan" type="button" class="btn btn-primary" data-i18n="ui.add_scan"></button></div>
-      </div>
-      <div class="d-flex flex-wrap">
-        <label class="sr-only" for="booking-select" data-i18n="ui.booking_ids"></label>
-        <select id="booking-select" class="form-control mr-2 mb-2" data-i18n-aria="ui.booking_ids"></select>
-        <button id="refresh-booking" type="button" class="btn btn-default mr-2 mb-2" data-i18n="ui.refresh_booking"></button>
-        <button id="rehydrate-plan" type="button" class="btn btn-default mr-2 mb-2" data-i18n="ui.rehydrate"></button>
-        <button id="complete-session" type="button" class="btn btn-primary mr-2 mb-2" data-i18n="ui.complete"></button>
-        <button id="delete-session" type="button" class="btn btn-danger mb-2" data-i18n="ui.delete"></button>
-      </div>
+          <div class="d-flex align-items-center my-3">
+            <hr class="flex-grow-1 my-0"><span class="text-muted px-2" data-i18n="ui.or"></span><hr class="flex-grow-1 my-0">
+          </div>
+          <div class="form-group mb-3">
+            <label for="device-id" data-i18n="ui.device_id_manual"></label>
+            <input id="device-id" class="form-control" autocomplete="off" spellcheck="false" data-i18n-placeholder="ui.device_id_placeholder">
+          </div>
+          <div class="d-flex">
+            <button id="activate-device" type="button" class="btn btn-primary flex-grow-1 mr-2 mb-2" data-i18n="ui.activate_sync"></button>
+            <button id="check-device" type="button" class="btn btn-default mb-2" data-i18n="ui.check_device"></button>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-6 mb-3">
+            <div class="frappe-card p-3 h-100"><small class="text-muted d-block" data-i18n="ui.device_name"></small><strong id="device-name-label" class="text-break"></strong></div>
+          </div>
+          <div class="col-6 mb-3">
+            <div class="frappe-card p-3 h-100"><small class="text-muted d-block" data-i18n="ui.company"></small><strong id="device-company-label" class="text-break"></strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="home-view" hidden>
+        <div class="frappe-card p-3 mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center">
+            <h2 class="h5" data-i18n="ui.device"></h2>
+            <button id="change-device" class="btn btn-default btn-sm" type="button" data-i18n="ui.clear_device"></button>
+          </div>
+          <p id="device-summary" class="text-muted text-break"></p>
+          <div class="row">
+            <div class="col-md-6 form-group"><label for="vehicle" data-i18n="ui.vehicle"></label><input id="vehicle" class="form-control"></div>
+            <div class="col-md-6 form-group"><label for="driver" data-i18n="ui.driver"></label><input id="driver" class="form-control"></div>
+          </div>
+          <div class="form-group"><label for="booking-ids" data-i18n="ui.booking_ids"></label><textarea id="booking-ids" class="form-control" rows="3" aria-describedby="booking-hint"></textarea><small id="booking-hint" class="text-muted" data-i18n="ui.booking_hint"></small></div>
+          <button id="start-session" type="button" class="btn btn-primary btn-block" data-i18n="ui.start"></button>
+        </div>
+        <div class="row">
+          <section class="col-12 mb-3"><div class="frappe-card p-3"><div class="d-flex justify-content-between align-items-center"><h2 class="h5" data-i18n="ui.active"></h2><button id="refresh-active" type="button" class="btn btn-default btn-sm" data-i18n="ui.refresh"></button></div><div id="active-list"></div></div></section>
+          <section class="col-12 mb-3"><div class="frappe-card p-3"><div class="d-flex justify-content-between align-items-center"><h2 class="h5" data-i18n="ui.history"></h2><button id="refresh-history" type="button" class="btn btn-default btn-sm" data-i18n="ui.refresh"></button></div><div id="history-list"></div></div></section>
+        </div>
+      </section>
+
+      <section id="session-view" hidden>
+        <div class="frappe-card p-3 mb-3">
+          <div class="d-flex flex-wrap justify-content-between align-items-center">
+            <h2 id="session-title" class="h5"></h2>
+            <button id="back-home" type="button" class="btn btn-default btn-sm" data-i18n="ui.history"></button>
+          </div>
+          <p id="session-summary" class="text-muted"></p>
+          <div id="session-warnings" class="alert alert-warning" hidden></div>
+          <div class="form-group"><label for="session-vehicle" data-i18n="ui.vehicle"></label><input id="session-vehicle" class="form-control"></div>
+          <div class="form-group"><label for="session-driver" data-i18n="ui.driver"></label><input id="session-driver" class="form-control"></div>
+          <div class="form-group"><label for="session-note" data-i18n="ui.note"></label><textarea id="session-note" class="form-control" rows="2"></textarea></div>
+          <div id="scan-controls" class="form-group">
+            <label for="rfid-input" data-i18n="ui.scan_rfid"></label><input id="rfid-input" class="form-control" autocomplete="off" spellcheck="false">
+            <button id="add-scan" type="button" class="btn btn-primary btn-block mt-2" data-i18n="ui.add_scan"></button>
+          </div>
+          <div class="form-group"><label class="sr-only" for="booking-select" data-i18n="ui.booking_ids"></label><select id="booking-select" class="form-control" data-i18n-aria="ui.booking_ids"></select></div>
+          <div class="d-flex flex-column">
+            <button id="refresh-booking" type="button" class="btn btn-default mb-2" data-i18n="ui.refresh_booking"></button>
+            <button id="rehydrate-plan" type="button" class="btn btn-default mb-2" data-i18n="ui.rehydrate"></button>
+            <button id="complete-session" type="button" class="btn btn-primary mb-2" data-i18n="ui.complete"></button>
+            <button id="delete-session" type="button" class="btn btn-danger mb-2" data-i18n="ui.delete"></button>
+          </div>
+        </div>
+        <section class="frappe-card p-3 mb-3"><h3 class="h6" data-i18n="ui.po"></h3><div id="po-list" class="table-responsive"></div></section>
+        <section class="frappe-card p-3 mb-3"><h3 class="h6" data-i18n="ui.items"></h3><div id="item-list" class="table-responsive"></div></section>
+        <section class="frappe-card p-3 mb-3"><h3 class="h6" data-i18n="ui.boxes"></h3><div id="box-list" class="table-responsive"></div></section>
+        <section class="frappe-card p-3 mb-3"><h3 class="h6" data-i18n="ui.scans"></h3><div id="scan-list" class="table-responsive"></div></section>
+      </section>
     </div>
-    <div class="row">
-      <section class="col-lg-6 mb-3"><div class="frappe-card p-3"><h3 class="h6" data-i18n="ui.po"></h3><div id="po-list" class="table-responsive"></div></div></section>
-      <section class="col-lg-6 mb-3"><div class="frappe-card p-3"><h3 class="h6" data-i18n="ui.items"></h3><div id="item-list" class="table-responsive"></div></div></section>
-      <section class="col-lg-6 mb-3"><div class="frappe-card p-3"><h3 class="h6" data-i18n="ui.boxes"></h3><div id="box-list" class="table-responsive"></div></div></section>
-      <section class="col-lg-6 mb-3"><div class="frappe-card p-3"><h3 class="h6" data-i18n="ui.scans"></h3><div id="scan-list" class="table-responsive"></div></div></section>
-    </div>
-  </section>
+  </div>
 </main>

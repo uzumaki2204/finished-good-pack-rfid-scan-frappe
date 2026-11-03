@@ -14,6 +14,7 @@
     document.documentElement.lang = language;
     document.querySelectorAll('[data-i18n]').forEach(node => { node.textContent = text(node.dataset.i18n); });
     document.querySelectorAll('[data-i18n-aria]').forEach(node => { node.setAttribute('aria-label', text(node.dataset.i18nAria)); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(node => { node.setAttribute('placeholder', text(node.dataset.i18nPlaceholder)); });
   };
   const setLanguage = value => {
     if (!catalog[value]) return;

@@ -43,6 +43,13 @@
     node.className = `indicator-pill ${navigator.onLine ? 'green' : 'orange'} mr-2`;
     node.textContent = i18n.text(navigator.onLine ? 'ui.online' : 'ui.offline');
   };
+  const renderDeviceInfo = () => {
+    const badge = $('device-status-badge');
+    badge.className = `indicator-pill ${state.device ? 'green' : 'orange'}`;
+    badge.textContent = i18n.text(state.device ? 'ui.device_activated' : 'ui.device_not_activated');
+    $('device-name-label').textContent = state.device?.deviceName || i18n.text('ui.not_available');
+    $('device-company-label').textContent = state.device?.companyName || i18n.text('ui.not_available');
+  };
   const views = name => {
     for (const id of ['device-view', 'home-view', 'session-view']) show(id, id === name);
   };
@@ -153,7 +160,7 @@
     try {
       const device = await api('device_check', { deviceId: id });
       state.device = device; await store.put('meta', device, 'device');
-      $('device-id').value = device.id; stopCamera(); notice('success.device_ready', 'success'); await loadHome();
+      $('device-id').value = device.id; renderDeviceInfo(); stopCamera(); notice('success.device_ready', 'success'); await loadHome();
     } catch (error) { explain(error); }
   };
   const start = async () => {
@@ -217,7 +224,7 @@
     if (state.cameraTimer) clearInterval(state.cameraTimer);
     state.cameraTimer = null;
     if (state.stream) state.stream.getTracks().forEach(track => track.stop());
-    state.stream = null; $('qr-video').srcObject = null; show('qr-video', false);
+    state.stream = null; $('qr-video').srcObject = null;
     $('camera-status').textContent = i18n.text('ui.camera_idle');
   };
   const parseDeviceId = raw => {
@@ -230,7 +237,7 @@
     try {
       const detector = new BarcodeDetector({ formats: ['qr_code'] });
       state.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      const video = $('qr-video'); video.srcObject = state.stream; show('qr-video', true); await video.play();
+      const video = $('qr-video'); video.srcObject = state.stream; await video.play();
       $('camera-status').textContent = i18n.text('ui.camera_scanning');
       state.cameraTimer = setInterval(async () => {
         if (!state.stream || video.readyState < 2) return;
@@ -242,12 +249,13 @@
   const init = async () => {
     i18n.render(); $('language').value = i18n.language; renderNetwork();
     $('language').onchange = event => i18n.setLanguage(event.target.value);
-    document.addEventListener('rfid:language', () => { renderNetwork(); if (state.session) renderSession(); else if (state.device) loadHome(); });
+    document.addEventListener('rfid:language', () => { renderNetwork(); renderDeviceInfo(); if (state.session) renderSession(); else if (state.device) loadHome(); });
     window.addEventListener('online', renderNetwork); window.addEventListener('offline', renderNetwork);
     $('activate-device').onclick = () => activate(value('device-id'));
+    $('check-device').onclick = () => activate(value('device-id'));
     $('device-id').onkeydown = event => { if (event.key === 'Enter') activate(value('device-id')); };
     $('scan-qr').onclick = scanQr;
-    $('change-device').onclick = async () => { stopCamera(); state.device = null; state.session = null; await store.remove('meta', 'device'); await store.remove('meta', 'currentSession'); views('device-view'); };
+    $('change-device').onclick = async () => { stopCamera(); state.device = null; state.session = null; renderDeviceInfo(); $('device-id').value = ''; await store.remove('meta', 'device'); await store.remove('meta', 'currentSession'); views('device-view'); };
     $('start-session').onclick = start;
     $('refresh-active').onclick = loadHome; $('refresh-history').onclick = loadHome;
     $('back-home').onclick = async () => { state.session = null; await store.remove('meta', 'currentSession'); await loadHome(); };
@@ -256,6 +264,7 @@
     $('refresh-booking').onclick = refreshBooking; $('rehydrate-plan').onclick = rehydrate;
     try {
       state.device = await store.get('meta', 'device');
+      renderDeviceInfo();
       if (state.device) {
         if (navigator.onLine) state.device = await api('device_check');
         const current = await store.get('meta', 'currentSession');

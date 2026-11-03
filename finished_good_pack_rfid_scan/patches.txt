@@ -2,3 +2,4 @@
 
 [post_model_sync]
 finished_good_pack_rfid_scan.patches.v0_1_0_setup
+finished_good_pack_rfid_scan.patches.v0_1_4_sync_tablet_layout
