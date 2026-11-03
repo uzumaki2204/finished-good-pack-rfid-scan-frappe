@@ -11,6 +11,7 @@ required_apps = ["factory_management"]
 
 add_to_apps_screen = [{
     "name": app_name,
+    "logo": "/assets/finished_good_pack_rfid_scan/rfid/icon.svg",
     "title": app_title,
     "route": "/finished-good-pack-rfid-scan",
     "has_permission": "finished_good_pack_rfid_scan.access.can_open",
