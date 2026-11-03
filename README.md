@@ -26,6 +26,8 @@ Không đưa thông tin đăng nhập SOAP, SQL hoặc SSH vào GitHub, OpenAPI 
 
 Nếu Desk chưa hiện biểu tượng, kiểm tra **Installed Apps** của đúng site trong Pilot. App phải có tên `finished_good_pack_rfid_scan` và trang `/finished-good-pack-rfid-scan` phải mở được. Nếu API báo `App finished_good_pack_rfid_scan is not installed`, hãy dùng bước **Install App** trên site; thao tác **Update App** trên bench chưa đủ.
 
+Khi API trả HTTP 500, nội dung response vẫn giữ thông báo chung; **Error Log** của Frappe ghi traceback trong bản `0.1.6` trở lên để quản trị viên truy nguyên lỗi.
+
 ## Luồng API
 
 Một endpoint Frappe: `/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=...`. GET: `device_check`, `active`, `history`, `session`, `preview_conflicts`. POST JSON: `start`, `preload`, `refresh_delta`, `rehydrate`, `complete`, `delete`. Mọi thao tác kiểm tra lại ID của Factory Device và dùng Company lấy từ thiết bị. Payload phản hồi nằm trong `message` chuẩn của Frappe, bên trong có `success`, `data`, `message` và `errorCode` khi lỗi.

@@ -1,5 +1,7 @@
 """Tablet API. Every operation resolves the approved Frappe device again."""
 
+import traceback
+
 import frappe
 
 from finished_good_pack_rfid_scan import service
@@ -77,12 +79,13 @@ def dispatch(operation: str):
         frappe.local.response.http_status_code = 400
         return {"success": False, "data": None, "errorCode": "error.invalid_request",
                 "message": message("error.invalid_request")}
-    except Exception as error:
+    except Exception:
         if frappe.request.method == "POST":
             frappe.db.rollback()
+        diagnostic = traceback.format_exc()
         frappe.log_error(
             title=message("diagnostic.api_operation", operation=operation),
-            message=type(error).__name__,
+            message=diagnostic,
         )
         frappe.local.response.http_status_code = 500
         return {"success": False, "data": None, "errorCode": "error.unexpected",
