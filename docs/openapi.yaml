@@ -1,0 +1,151 @@
+openapi: 3.0.3
+info:
+  title: Finished Good Pack RFID Scan API
+  version: 0.1.0
+  description: Frappe v16 tablet endpoint. Responses use the standard Frappe message wrapper. Device IDs below are examples only.
+servers:
+  - url: https://frappe.example.invalid
+paths:
+  /api/method/finished_good_pack_rfid_scan.api.dispatch:
+    get:
+      operationId: readRfidScan
+      summary: Check device, preview conflicts, or read sessions
+      parameters:
+        - in: query
+          name: operation
+          required: true
+          schema:
+            type: string
+            enum: [device_check, active, history, session, preview_conflicts]
+        - in: query
+          name: deviceId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: sessionId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [Active, Completed] }
+        - in: query
+          name: pageIndex
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: bookingIds
+          description: JSON encoded array of Booking IDs for preview_conflicts.
+          schema: { type: string, example: '["BOOK-001","BOOK-002"]' }
+      responses:
+        '200':
+          description: Operation succeeded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FrappeResponse' }
+        '400':
+          description: Invalid input.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FrappeResponse' }
+        '403':
+          description: Device is missing or not approved.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FrappeResponse' }
+    post:
+      operationId: writeRfidScan
+      summary: Start or update a session and its booking snapshot
+      parameters:
+        - in: query
+          name: operation
+          required: true
+          schema:
+            type: string
+            enum: [start, preload, refresh_delta, rehydrate, complete, delete]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WriteRequest' }
+            examples:
+              start:
+                value:
+                  deviceId: 11111111-1111-4111-8111-111111111111
+                  bookingIds: [BOOK-001, BOOK-002]
+                  confirmConflicts: false
+                  vehiclePlateNumber: 51A-12345
+                  driverFullName: Nguyen Van A
+              complete:
+                value:
+                  deviceId: 11111111-1111-4111-8111-111111111111
+                  sessionId: 22222222-2222-4222-8222-222222222222
+                  vehiclePlateNumber: 51A-12345
+                  driverFullName: Nguyen Van A
+                  note: ''
+                  scans:
+                    - bookingId: BOOK-001
+                      finishedGoodPackDetailId: 33333333-3333-4333-8333-333333333333
+                      rfid: RFID-EXAMPLE-001
+                      scannedAtUtc: '2026-01-01T08:00:00Z'
+      responses:
+        '200':
+          description: Operation succeeded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FrappeResponse' }
+        '400':
+          description: Validation failed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FrappeResponse' }
+        '403':
+          description: Device is not approved or does not own the active session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FrappeResponse' }
+        '409':
+          description: Booking already has another active session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FrappeResponse' }
+        '502':
+          description: SOAP source unavailable or invalid.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FrappeResponse' }
+components:
+  schemas:
+    FrappeResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [success, data, message]
+          properties:
+            success: { type: boolean }
+            data: { nullable: true }
+            message: { type: string }
+            errorCode: { type: string }
+    WriteRequest:
+      type: object
+      required: [deviceId]
+      properties:
+        deviceId: { type: string, description: Approved Frappe Factory Device ID }
+        sessionId: { type: string, format: uuid }
+        bookingId: { type: string }
+        bookingIds:
+          type: array
+          items: { type: string }
+        confirmConflicts: { type: boolean }
+        vehiclePlateNumber: { type: string }
+        driverFullName: { type: string }
+        note: { type: string }
+        scans:
+          type: array
+          items:
+            type: object
+            required: [bookingId, finishedGoodPackDetailId, rfid, scannedAtUtc]
+            properties:
+              bookingId: { type: string }
+              finishedGoodPackDetailId: { type: string, format: uuid }
+              rfid: { type: string }
+              scannedAtUtc: { type: string, format: date-time }

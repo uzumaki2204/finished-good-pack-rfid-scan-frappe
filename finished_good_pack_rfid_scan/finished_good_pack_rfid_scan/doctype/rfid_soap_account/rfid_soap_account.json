@@ -1,0 +1,83 @@
+{
+  "doctype": "DocType",
+  "name": "RFID SOAP Account",
+  "module": "Finished Good Pack RFID Scan",
+  "custom": 0,
+  "autoname": "field:company",
+  "track_changes": 1,
+  "fields": [
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "enabled",
+      "label": "Enabled",
+      "fieldtype": "Check",
+      "default": "1",
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "service_url",
+      "label": "SOAP URL",
+      "fieldtype": "Data",
+      "length": 500,
+      "reqd": 1
+    },
+    {
+      "fieldname": "username",
+      "label": "Username",
+      "fieldtype": "Data",
+      "length": 100,
+      "reqd": 1
+    },
+    {
+      "fieldname": "password",
+      "label": "Password",
+      "fieldtype": "Password",
+      "reqd": 1
+    },
+    {
+      "fieldname": "login_ip",
+      "label": "Login IP",
+      "fieldtype": "Data",
+      "length": 100
+    },
+    {
+      "fieldname": "login_device",
+      "label": "Login Device",
+      "fieldtype": "Data",
+      "length": 100
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1
+    },
+    {
+      "role": "RFID Scan Manager",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "delete": 1
+    }
+  ],
+  "field_order": [
+    "company",
+    "enabled",
+    "service_url",
+    "username",
+    "password",
+    "login_ip",
+    "login_device"
+  ]
+}

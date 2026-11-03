@@ -1,0 +1,83 @@
+{
+  "doctype": "DocType",
+  "name": "RFID Booking Snapshot",
+  "module": "Finished Good Pack RFID Scan",
+  "custom": 0,
+  "autoname": "field:snapshot_key",
+  "sort_field": "captured_at",
+  "sort_order": "DESC",
+  "fields": [
+    {
+      "fieldname": "snapshot_key",
+      "label": "Snapshot Key",
+      "fieldtype": "Data",
+      "length": 64,
+      "reqd": 1,
+      "unique": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "session",
+      "label": "Session",
+      "fieldtype": "Link",
+      "options": "RFID Scan Session",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1
+    },
+    {
+      "fieldname": "booking_id",
+      "label": "Booking ID",
+      "fieldtype": "Data",
+      "length": 100,
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "plan_version",
+      "label": "Plan Version",
+      "fieldtype": "Data",
+      "length": 128
+    },
+    {
+      "fieldname": "captured_at",
+      "label": "Captured At",
+      "fieldtype": "Datetime",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "payload",
+      "label": "Plan Snapshot",
+      "fieldtype": "Long Text",
+      "reqd": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "report": 1
+    },
+    {
+      "role": "RFID Scan Manager",
+      "read": 1,
+      "report": 1
+    }
+  ],
+  "field_order": [
+    "snapshot_key",
+    "session",
+    "company",
+    "booking_id",
+    "plan_version",
+    "captured_at",
+    "payload"
+  ]
+}

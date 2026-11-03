@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finished_good_pack_rfid_scan"
+version = "0.1.0"
+description = "Finished good pack RFID scanning for Frappe 16"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = ["requests>=2.31"]
+
+[tool.bench.frappe-dependencies]
+frappe = ">=16.53.0,<17.0.0"
+factory_management = ">=0.1.76,<0.2.0"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["finished_good_pack_rfid_scan*"]
+
+[tool.setuptools.package-data]
+finished_good_pack_rfid_scan = [
+    "*.txt", "*.json", "*.html", "public/rfid/*.js", "public/rfid/*.json",
+    "templates/*.html", "templates/includes/*.html", "www/*.js",
+    "finished_good_pack_rfid_scan/doctype/*/*.json", "translations/*.csv",
+]

@@ -1,0 +1,147 @@
+{
+  "doctype": "DocType",
+  "name": "RFID Scan Detail",
+  "module": "Finished Good Pack RFID Scan",
+  "custom": 0,
+  "autoname": "field:scan_key",
+  "sort_field": "scanned_at",
+  "sort_order": "DESC",
+  "fields": [
+    {
+      "fieldname": "scan_key",
+      "label": "Scan Key",
+      "fieldtype": "Data",
+      "length": 64,
+      "reqd": 1,
+      "unique": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "session",
+      "label": "Session",
+      "fieldtype": "Link",
+      "options": "RFID Scan Session",
+      "reqd": 1,
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "device",
+      "label": "Factory Device",
+      "fieldtype": "Link",
+      "options": "Factory Device",
+      "reqd": 1
+    },
+    {
+      "fieldname": "detail_id",
+      "label": "Pack Detail ID",
+      "fieldtype": "Data",
+      "length": 36,
+      "reqd": 1
+    },
+    {
+      "fieldname": "rfid",
+      "label": "RFID",
+      "fieldtype": "Data",
+      "length": 200,
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "normalized_rfid",
+      "label": "Normalized RFID",
+      "fieldtype": "Data",
+      "length": 200,
+      "reqd": 1
+    },
+    {
+      "fieldname": "scanned_at",
+      "label": "Scanned At",
+      "fieldtype": "Datetime",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "booking_id",
+      "label": "Booking ID",
+      "fieldtype": "Data",
+      "length": 100,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "order_no",
+      "label": "Order No",
+      "fieldtype": "Data",
+      "length": 100
+    },
+    {
+      "fieldname": "do_no",
+      "label": "DO No",
+      "fieldtype": "Data",
+      "length": 100
+    },
+    {
+      "fieldname": "item_code",
+      "label": "Item Code",
+      "fieldtype": "Data",
+      "length": 100
+    },
+    {
+      "fieldname": "disp_pack_num",
+      "label": "Box No",
+      "fieldtype": "Data",
+      "length": 100
+    },
+    {
+      "fieldname": "is_metal_check",
+      "label": "Metal Checked",
+      "fieldtype": "Check",
+      "default": "0"
+    },
+    {
+      "fieldname": "payload",
+      "label": "Scan Snapshot",
+      "fieldtype": "Long Text",
+      "reqd": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "report": 1,
+      "export": 1
+    },
+    {
+      "role": "RFID Scan Manager",
+      "read": 1,
+      "report": 1,
+      "export": 1
+    }
+  ],
+  "field_order": [
+    "scan_key",
+    "session",
+    "company",
+    "device",
+    "detail_id",
+    "rfid",
+    "normalized_rfid",
+    "scanned_at",
+    "booking_id",
+    "order_no",
+    "do_no",
+    "item_code",
+    "disp_pack_num",
+    "is_metal_check",
+    "payload"
+  ]
+}

@@ -1,0 +1,161 @@
+{
+  "doctype": "DocType",
+  "name": "RFID Scan Session",
+  "module": "Finished Good Pack RFID Scan",
+  "custom": 0,
+  "autoname": "field:session_id",
+  "track_changes": 1,
+  "sort_field": "session_started_at",
+  "sort_order": "DESC",
+  "fields": [
+    {
+      "fieldname": "session_id",
+      "label": "Session ID",
+      "fieldtype": "Data",
+      "length": 36,
+      "reqd": 1,
+      "unique": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "options": "Company",
+      "reqd": 1,
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "device",
+      "label": "Factory Device",
+      "fieldtype": "Link",
+      "options": "Factory Device",
+      "reqd": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "status",
+      "label": "Status",
+      "fieldtype": "Select",
+      "options": "Active\nCompleted\nDeleted",
+      "reqd": 1,
+      "in_list_view": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "session_started_at",
+      "label": "Started At",
+      "fieldtype": "Datetime",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "session_completed_at",
+      "label": "Completed At",
+      "fieldtype": "Datetime"
+    },
+    {
+      "fieldname": "deleted_at",
+      "label": "Deleted At",
+      "fieldtype": "Datetime"
+    },
+    {
+      "fieldname": "vehicle_plate_number",
+      "label": "Vehicle Plate",
+      "fieldtype": "Data",
+      "length": 100
+    },
+    {
+      "fieldname": "driver_full_name",
+      "label": "Driver",
+      "fieldtype": "Data",
+      "length": 140
+    },
+    {
+      "fieldname": "note",
+      "label": "Note",
+      "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "booking_ids_json",
+      "label": "Booking IDs",
+      "fieldtype": "Long Text",
+      "reqd": 1
+    },
+    {
+      "fieldname": "planned_item_count",
+      "label": "Planned RFID",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "planned_box_count",
+      "label": "Planned Boxes",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "total_scanned_count",
+      "label": "Scanned RFID",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "metal_checked_count",
+      "label": "Metal Checked",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "cross_session_duplicate_count",
+      "label": "Cross Session Duplicates",
+      "fieldtype": "Int",
+      "default": "0"
+    },
+    {
+      "fieldname": "completion_hash",
+      "label": "Completion Hash",
+      "fieldtype": "Data",
+      "length": 64,
+      "hidden": 1
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1,
+      "report": 1,
+      "export": 1
+    },
+    {
+      "role": "RFID Scan Manager",
+      "read": 1,
+      "report": 1,
+      "export": 1
+    },
+    {
+      "role": "RFID Scan Operator",
+      "read": 1
+    }
+  ],
+  "field_order": [
+    "session_id",
+    "company",
+    "device",
+    "status",
+    "session_started_at",
+    "session_completed_at",
+    "deleted_at",
+    "vehicle_plate_number",
+    "driver_full_name",
+    "note",
+    "booking_ids_json",
+    "planned_item_count",
+    "planned_box_count",
+    "total_scanned_count",
+    "metal_checked_count",
+    "cross_session_duplicate_count",
+    "completion_hash"
+  ]
+}

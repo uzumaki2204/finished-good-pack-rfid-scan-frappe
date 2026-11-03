@@ -1,0 +1,412 @@
+{
+  "info": {
+    "name": "Finished Good Pack RFID Scan Frappe",
+    "description": "Sample IDs only. Configure baseUrl and approved Frappe Factory Device ID locally; never export credentials.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://frappe.example.invalid"
+    },
+    {
+      "key": "deviceId",
+      "value": "11111111-1111-4111-8111-111111111111"
+    },
+    {
+      "key": "sessionId",
+      "value": "22222222-2222-4222-8222-222222222222"
+    }
+  ],
+  "item": [
+    {
+      "name": "Check approved device",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=device_check&deviceId={{deviceId}}",
+          "query": [
+            {
+              "key": "operation",
+              "value": "device_check"
+            },
+            {
+              "key": "deviceId",
+              "value": "{{deviceId}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Preview booking conflicts",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=preview_conflicts&deviceId={{deviceId}}&bookingIds=[\"BOOK-001\",\"BOOK-002\"]",
+          "query": [
+            {
+              "key": "operation",
+              "value": "preview_conflicts"
+            },
+            {
+              "key": "deviceId",
+              "value": "{{deviceId}}"
+            },
+            {
+              "key": "bookingIds",
+              "value": "[\"BOOK-001\",\"BOOK-002\"]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Start multi-booking session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=start",
+          "query": [
+            {
+              "key": "operation",
+              "value": "start"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"bookingIds\": [\n    \"BOOK-001\",\n    \"BOOK-002\"\n  ],\n  \"confirmConflicts\": false,\n  \"vehiclePlateNumber\": \"51A-12345\",\n  \"driverFullName\": \"Nguyễn Văn A\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Active sessions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=active&deviceId={{deviceId}}",
+          "query": [
+            {
+              "key": "operation",
+              "value": "active"
+            },
+            {
+              "key": "deviceId",
+              "value": "{{deviceId}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Session details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=session&deviceId={{deviceId}}&sessionId={{sessionId}}",
+          "query": [
+            {
+              "key": "operation",
+              "value": "session"
+            },
+            {
+              "key": "deviceId",
+              "value": "{{deviceId}}"
+            },
+            {
+              "key": "sessionId",
+              "value": "{{sessionId}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Completed history",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=history&deviceId={{deviceId}}&status=Completed&pageIndex=1",
+          "query": [
+            {
+              "key": "operation",
+              "value": "history"
+            },
+            {
+              "key": "deviceId",
+              "value": "{{deviceId}}"
+            },
+            {
+              "key": "status",
+              "value": "Completed"
+            },
+            {
+              "key": "pageIndex",
+              "value": "1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Preload booking",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=preload",
+          "query": [
+            {
+              "key": "operation",
+              "value": "preload"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"sessionId\": \"{{sessionId}}\",\n  \"bookingId\": \"BOOK-001\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Refresh booking delta",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=refresh_delta",
+          "query": [
+            {
+              "key": "operation",
+              "value": "refresh_delta"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"sessionId\": \"{{sessionId}}\",\n  \"bookingId\": \"BOOK-001\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Rehydrate plan",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=rehydrate",
+          "query": [
+            {
+              "key": "operation",
+              "value": "rehydrate"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"sessionId\": \"{{sessionId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Complete session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=complete",
+          "query": [
+            {
+              "key": "operation",
+              "value": "complete"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"sessionId\": \"{{sessionId}}\",\n  \"vehiclePlateNumber\": \"51A-12345\",\n  \"driverFullName\": \"Nguyễn Văn A\",\n  \"note\": \"\",\n  \"scans\": [\n    {\n      \"bookingId\": \"BOOK-001\",\n      \"finishedGoodPackDetailId\": \"33333333-3333-4333-8333-333333333333\",\n      \"rfid\": \"RFID-EXAMPLE-001\",\n      \"scannedAtUtc\": \"2026-01-01T08:00:00Z\"\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Delete session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept-Language",
+            "value": "vi"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=delete",
+          "query": [
+            {
+              "key": "operation",
+              "value": "delete"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"deviceId\": \"{{deviceId}}\",\n  \"sessionId\": \"{{sessionId}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
