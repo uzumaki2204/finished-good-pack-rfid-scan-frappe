@@ -12,7 +12,7 @@
   let scanQueue = Promise.resolve();
   const SESSION_TABS = ['po', 'items', 'boxes'];
   const BOX_FILTERS = ['not-scanned', 'scanning', 'completed'];
-  const COMPLETION_LOCKED_CONTROLS = ['back-home', 'device-settings', 'refresh-booking', 'rehydrate-plan', 'delete-session'];
+  const COMPLETION_LOCKED_CONTROLS = ['back-home', 'device-settings'];
   const normalized = value => String(value || '').trim().toUpperCase();
   const normalizedRfid = value => String(value || '').replace(/[\u0000-\u0008\u000A-\u001F\u007F-\u009F]/g, '').trim().slice(0, 200).toUpperCase();
   const formatCount = count => Number(count || 0).toLocaleString(i18n.language === 'vi' ? 'vi-VN' : 'en-US');
@@ -261,7 +261,6 @@
     show('scan-dock', editable && !state.completing);
     show('scan-dock-spacer', editable && !state.completing);
     show('completion-form', editable && state.completing);
-    show('session-actions', editable);
     if (s.sessionStatus === 'Completed') {
       const total = Number(s.totalScannedCount ?? scans.length);
       state.completionProgress = { phase: 'complete', uploaded: total, total };
@@ -273,10 +272,6 @@
     $('completed-note').textContent = s.note || i18n.text('ui.not_available');
     const warnings = s.planningWarnings || [];
     show('session-warnings', warnings.length > 0); $('session-warnings').replaceChildren(...warnings.map(w => { const p = document.createElement('p'); p.textContent = w; return p; }));
-    const bookingSelect = $('booking-select');
-    const selectedBooking = bookingSelect.value;
-    bookingSelect.replaceChildren(...(s.bookingIds || []).map(id => { const option = document.createElement('option'); option.value = id; option.textContent = id; return option; }));
-    if ((s.bookingIds || []).includes(selectedBooking)) bookingSelect.value = selectedBooking;
     const scannedIds = new Set(scans.map(x => `${x.bookingId}|${x.finishedGoodPackDetailId}`));
     const po = new Map(), items = new Map(), boxes = new Map(), poBoxKeys = new Map(), poPendingBoxes = new Map();
     for (const booking of s.preloadedBookings || []) {
@@ -385,7 +380,8 @@
   const resetSessionNavigation = () => {
     closeItemDetail();
     state.renderedSessionId = null; state.activeSessionTab = 'po'; state.activeBoxFilter = 'not-scanned';
-    state.boxSearch = ''; state.sessionRows = null; state.completing = false;
+    state.boxSearch = ''; state.sessionRows = null; state.completing = false; state.completionProgress = null;
+    renderCompletionProgress();
     lockCompletionNavigation(false);
     $('box-search').value = '';
   };
@@ -675,12 +671,18 @@
         vehiclePlateNumber, driverFullName, note: value('completion-note') }, 'POST');
       const uploaded = Number(session.totalScannedCount ?? scans.length);
       state.completionProgress = { phase: 'complete', uploaded, total: scans.length };
-      renderCompletionProgress();
       state.completing = false;
       lockCompletionNavigation(false);
-      try { await store.clearScans(session.sessionId); await saveSession(session); }
-      catch { state.session = session; await renderSession(); return notice('error.offline_storage', 'danger'); }
-      notice('success.session_completed', 'success');
+      let cacheReady = true;
+      try { await store.clearScans(session.sessionId); } catch { cacheReady = false; }
+      try { await store.put('sessions', session); } catch { cacheReady = false; }
+      try { await store.remove('meta', 'currentSession'); } catch { cacheReady = false; }
+      state.session = null;
+      resetSessionNavigation();
+      await loadHome();
+      notice(cacheReady ? 'ui.uploaded_records' : 'ui.uploaded_records_cache_warning', cacheReady ? 'success' : 'warning', {
+        uploaded: formatCount(uploaded), total: formatCount(scans.length),
+      });
     } catch (error) {
       state.completionProgress = { phase: 'failed', uploaded: 0, total };
       renderCompletionProgress();
@@ -700,18 +702,6 @@
     } catch { cacheError = true; }
     if (state.session?.sessionId === sessionId) { state.session = null; resetSessionNavigation(); }
     await loadHome(); notice(cacheError ? 'error.offline_storage' : 'success.session_deleted', cacheError ? 'danger' : 'success');
-  };
-  const refreshBooking = async () => {
-    const bookingId = value('booking-select');
-    if (!bookingId) return notice('error.plan_missing', 'danger');
-    try {
-      const result = await api('refresh_delta', { sessionId: state.session.sessionId, bookingId }, 'POST');
-      await saveSession(result.session); notice('success.booking_refreshed', 'success');
-    } catch (error) { explain(error); }
-  };
-  const rehydrate = async () => {
-    try { const result = await api('rehydrate', { sessionId: state.session.sessionId }, 'POST'); await saveSession(result.session); notice('success.plan_restored', 'success'); }
-    catch (error) { explain(error); }
   };
   const stopCamera = () => {
     if (state.cameraTimer) clearInterval(state.cameraTimer);
@@ -771,8 +761,6 @@
     document.addEventListener('paste', handleScannerPaste);
     $('complete-session').onclick = beginCompletion;
     $('cancel-completion').onclick = cancelCompletion; $('confirm-completion').onclick = complete;
-    $('delete-session').onclick = () => deleteSession(state.session?.sessionId);
-    $('refresh-booking').onclick = refreshBooking; $('rehydrate-plan').onclick = rehydrate;
     for (const button of document.querySelectorAll('[data-session-tab]')) {
       button.onclick = () => selectSessionTab(button.dataset.sessionTab);
       button.onkeydown = event => navigateTabsWithKeyboard(event, SESSION_TABS, button.dataset.sessionTab, selectSessionTab);
