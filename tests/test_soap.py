@@ -40,7 +40,8 @@ class SoapContractTest(unittest.TestCase):
         self.assertEqual((packs[0]["innerPackNum"], pages), ("P-1", 1))
 
     def test_fault_is_rejected_without_exposing_server_detail(self):
-        response = types.SimpleNamespace(content=b"<Envelope><Fault><faultstring>private detail</faultstring></Fault></Envelope>", raise_for_status=lambda: None)
+        body = "<Envelope><Fault><faultstring>private detail</faultstring></Fault></Envelope>"
+        response = types.SimpleNamespace(content=body.encode("utf-8"), text=body, raise_for_status=lambda: None)
         with patch.object(soap.requests, "post", return_value=response), self.assertRaises(soap.RfidError) as error:
             soap._soap_call(self.account, "QueryBookingDetail", xml("<Envelope/>"))
         self.assertEqual(error.exception.key, "error.soap_result")

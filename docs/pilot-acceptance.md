@@ -3,11 +3,12 @@
 Chỉ thực hiện qua Pilot trên site thử nghiệm có `factory_management`. Không đăng nhập SSH và không sửa SQL Server.
 
 1. Cài nhánh `version-16`, chạy migrate. Xác nhận Module **Finished Good Pack RFID Scan**, bốn DocType, hai Role, trang `/finished-good-pack-rfid-scan` và patch `v0_1_0_setup` đã được ghi trong Patch Log.
-2. Mở tablet qua HTTPS. Xác nhận giao diện chỉ dùng style Desk; không có `site.css` hoặc theme khác. Đổi Việt/Anh và kiểm tra nhãn, lỗi, toast, fallback.
+2. Mở tablet qua HTTPS. Xác nhận giao diện chỉ dùng style Desk; không có `site.css` hoặc theme khác. Mở trang với `?lang=vi` và `?lang=en` để kiểm tra nhãn, lỗi, toast, fallback.
 3. Thử ID thiết bị sai, Pending, Deactivated, khác Company; chỉ Approved + active + Company được dùng. Kiểm tra thiết bị của Company A không mở/xóa/hoàn tất phiên của Company B hoặc thiết bị khác.
 4. Tạo **RFID SOAP Account** cho từng Company bằng thông tin thử nghiệm nhập trực tiếp trên site. Thử URL sai, mật khẩu sai, SOAP timeout, booking không tồn tại hoặc chưa có thùng. Không có mật khẩu trong GitHub hay API response.
-5. Nạp hai booking, xem xung đột phiên và thử tạo không xác nhận (409), sau đó xác nhận. Kiểm tra PO, item, box, thùng chưa map và cảnh báo kế hoạch.
-6. Quét RFID hợp lệ, quét trùng trong phiên, RFID không thuộc snapshot, gỡ scan nhầm. Làm mới một booking và kiểm tra delta tăng/giảm; nếu RFID cũ biến mất, gỡ scan cũ rồi retry hoàn tất.
+5. Nạp hai booking, xem xung đột phiên và thử tạo không xác nhận (409), sau đó xác nhận. Kiểm tra bốn tab PO, Mã hàng, Thùng, Đồng bộ; lọc thùng chưa scan/đang scan/hoàn thành, tìm số thùng, cảnh báo kế hoạch và số đếm trên tab.
+6. Quét RFID hợp lệ từ mỗi tab bằng thanh cố định dưới màn hình, quét trùng trong phiên, RFID không thuộc snapshot, gỡ scan nhầm. Xác nhận tab đang chọn không đổi sau khi quét hoặc làm mới booking; mở lại phiên thì về tab PO. Làm mới booking và kiểm tra delta tăng/giảm; nếu RFID cũ biến mất, gỡ scan cũ rồi retry hoàn tất.
 7. Tắt mạng sau khi shell và booking đã nạp. Mở lại trang, quét tiếp, khởi động lại trình duyệt và kiểm tra IndexedDB giữ scan. Bật mạng, hoàn tất và kiểm tra scan detail/đếm rà kim/lịch sử. Retry hoàn tất sau khi giả lập mất response phải trả cùng phiên đã hoàn thành.
 8. Quét QR trên HTTPS; trên trình duyệt không có BarcodeDetector hoặc camera bị từ chối, nhập ID thiết bị thủ công. Trên host HTTP, kiểm tra thông báo yêu cầu HTTPS.
 9. Xóa một phiên active và xác nhận không còn trong danh sách; phiên đã hoàn thành và scan mới chỉ nằm trong Frappe. Lịch sử .NET cũ vẫn chỉ ở ứng dụng cũ.
+10. Trên điện thoại khoảng 390×844 và màn hình rộng 1440×900, kiểm tra thanh dưới không che dòng cuối của tab. Phiên đang quét không hiện ô thông tin xe; bấm Hoàn thành mới hiện biển số, tài xế bắt buộc và ghi chú tùy chọn. Hủy giữ phiên active, lỗi API giữ nội dung đã nhập, hoàn tất thành công hiển thị thông tin chỉ đọc.

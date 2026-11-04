@@ -17,7 +17,7 @@ Branch: `version-16`.
 Yêu cầu: Frappe `>=16.53,<17`, `factory_management >=0.1.76,<0.2`.
 
 1. Thêm repository và branch vào **bench** trên Pilot, sau đó chọn **Install App** cho đúng **site** đang mở Desk. Chỉ có file trong `/assets/` nghĩa là mã đã có trên bench, chưa chứng minh app đã cài vào site.
-2. Chạy migration qua quy trình Pilot. `bench migrate` đồng bộ DocType, Module Def và chạy patch để tạo hoặc cập nhật HTML trang tablet; bản `0.1.5` thêm patch `v0_1_5_sync_mobile_header`. Không sửa trực tiếp trên máy chủ.
+2. Chạy migration qua quy trình Pilot. `bench migrate` đồng bộ DocType, Module Def và chạy patch để tạo hoặc cập nhật HTML trang tablet; bản `0.1.10` thêm patch `v0_1_10_sync_session_tabs`. Không sửa trực tiếp trên máy chủ.
 3. Biểu tượng app hiện cho người dùng đã đăng nhập Desk. Gán vai trò **RFID Scan Manager** hoặc **RFID Scan Operator** để xem các DocType tương ứng; manager tạo **RFID SOAP Account** theo Company và nhập URL, username, password trên Frappe.
 4. Tạo và duyệt thiết bị trong **Factory Device**; mở trang tablet trên HTTPS, nhập hoặc quét ID thiết bị Frappe.
 5. Nghiệm thu: chọn nhiều booking → xem xung đột → tạo phiên → scan RFID (có thể offline) → kết nối lại → hoàn thành → xem lịch sử.
@@ -33,6 +33,8 @@ Bản `0.1.7` đọc operation từ query string trực tiếp để tương th�
 Bản `0.1.8` loại ký tự không hợp lệ theo XML 1.0 trong phản hồi SOAP kiểu legacy và ghi tên operation cùng lỗi parser vào **Error Log** khi parse vẫn thất bại; nội dung SOAP không được ghi log.
 
 Bản `0.1.9` giữ nguyên kích hoạt khi mở cài đặt thiết bị từ biểu tượng trên header; nút **Đổi thiết bị** vẫn có thao tác xóa kích hoạt rõ ràng. Nút quay lại phục hồi màn hình đang dùng, kể cả phiên quét đang mở.
+
+Bản `0.1.10` chia dữ liệu phiên thành tab PO, Mã hàng, Thùng, Đồng bộ; bổ sung lọc và tìm số thùng. Trên màn hình quét, thanh RFID/hoàn thành cố định ở đáy. Biển số xe, tài xế và ghi chú được nhập ở bước hoàn thành; phiên đã hoàn thành hiển thị lại thông tin dưới dạng chỉ đọc.
 
 ## Luồng API
 

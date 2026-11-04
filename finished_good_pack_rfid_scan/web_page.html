@@ -67,10 +67,6 @@
             <button id="change-device" class="btn btn-default btn-sm" type="button" data-i18n="ui.clear_device"></button>
           </div>
           <p id="device-summary" class="text-muted text-break"></p>
-          <div class="row">
-            <div class="col-md-6 form-group"><label for="vehicle" data-i18n="ui.vehicle"></label><input id="vehicle" class="form-control"></div>
-            <div class="col-md-6 form-group"><label for="driver" data-i18n="ui.driver"></label><input id="driver" class="form-control"></div>
-          </div>
           <div class="form-group"><label for="booking-ids" data-i18n="ui.booking_ids"></label><textarea id="booking-ids" class="form-control" rows="3" aria-describedby="booking-hint"></textarea><small id="booking-hint" class="text-muted" data-i18n="ui.booking_hint"></small></div>
           <button id="start-session" type="button" class="btn btn-primary btn-block" data-i18n="ui.start"></button>
         </div>
@@ -84,29 +80,64 @@
         <div class="frappe-card p-3 mb-3">
           <div class="d-flex flex-wrap justify-content-between align-items-center">
             <h2 id="session-title" class="h5"></h2>
-            <button id="back-home" type="button" class="btn btn-default btn-sm" data-i18n="ui.history"></button>
+            <button id="back-home" type="button" class="btn btn-default btn-sm" data-i18n="ui.home"></button>
           </div>
           <p id="session-summary" class="text-muted"></p>
           <div id="session-warnings" class="alert alert-warning" hidden></div>
-          <div class="form-group"><label for="session-vehicle" data-i18n="ui.vehicle"></label><input id="session-vehicle" class="form-control"></div>
-          <div class="form-group"><label for="session-driver" data-i18n="ui.driver"></label><input id="session-driver" class="form-control"></div>
-          <div class="form-group"><label for="session-note" data-i18n="ui.note"></label><textarea id="session-note" class="form-control" rows="2"></textarea></div>
-          <div id="scan-controls" class="form-group">
-            <label for="rfid-input" data-i18n="ui.scan_rfid"></label><input id="rfid-input" class="form-control" autocomplete="off" spellcheck="false">
-            <button id="add-scan" type="button" class="btn btn-primary btn-block mt-2" data-i18n="ui.add_scan"></button>
-          </div>
-          <div class="form-group"><label class="sr-only" for="booking-select" data-i18n="ui.booking_ids"></label><select id="booking-select" class="form-control" data-i18n-aria="ui.booking_ids"></select></div>
-          <div class="d-flex flex-column">
-            <button id="refresh-booking" type="button" class="btn btn-default mb-2" data-i18n="ui.refresh_booking"></button>
-            <button id="rehydrate-plan" type="button" class="btn btn-default mb-2" data-i18n="ui.rehydrate"></button>
-            <button id="complete-session" type="button" class="btn btn-primary mb-2" data-i18n="ui.complete"></button>
-            <button id="delete-session" type="button" class="btn btn-danger mb-2" data-i18n="ui.delete"></button>
+          <div id="completed-details" class="row" hidden>
+            <div class="col-12 col-sm-6 mb-2"><small class="text-muted d-block" data-i18n="ui.vehicle"></small><strong id="completed-vehicle" class="text-break"></strong></div>
+            <div class="col-12 col-sm-6 mb-2"><small class="text-muted d-block" data-i18n="ui.driver"></small><strong id="completed-driver" class="text-break"></strong></div>
+            <div class="col-12 mb-2"><small class="text-muted d-block" data-i18n="ui.note"></small><span id="completed-note" class="text-break"></span></div>
           </div>
         </div>
-        <section class="frappe-card p-3 mb-3"><h3 class="h6" data-i18n="ui.po"></h3><div id="po-list" class="table-responsive"></div></section>
-        <section class="frappe-card p-3 mb-3"><h3 class="h6" data-i18n="ui.items"></h3><div id="item-list" class="table-responsive"></div></section>
-        <section class="frappe-card p-3 mb-3"><h3 class="h6" data-i18n="ui.boxes"></h3><div id="box-list" class="table-responsive"></div></section>
-        <section class="frappe-card p-3 mb-3"><h3 class="h6" data-i18n="ui.scans"></h3><div id="scan-list" class="table-responsive"></div></section>
+
+        <section id="completion-form" class="frappe-card p-3 mb-3" aria-labelledby="completion-title" hidden>
+          <h3 id="completion-title" class="h6" data-i18n="ui.complete_details"></h3>
+          <div class="form-group"><label for="completion-vehicle" data-i18n="ui.vehicle"></label><input id="completion-vehicle" class="form-control" autocomplete="off" required></div>
+          <div class="form-group"><label for="completion-driver" data-i18n="ui.driver"></label><input id="completion-driver" class="form-control" autocomplete="off" required></div>
+          <div class="form-group"><label for="completion-note" data-i18n="ui.note"></label><textarea id="completion-note" class="form-control" rows="3"></textarea></div>
+          <div class="d-flex">
+            <button id="cancel-completion" type="button" class="btn btn-default flex-grow-1 mr-2" data-i18n="ui.cancel"></button>
+            <button id="confirm-completion" type="button" class="btn btn-primary flex-grow-1" data-i18n="ui.confirm_completion"></button>
+          </div>
+        </section>
+
+        <div class="nav nav-tabs nav-fill mb-3" role="tablist" data-i18n-aria="ui.session_tabs">
+          <button id="tab-po" type="button" class="nav-link active small px-1" role="tab" data-session-tab="po" aria-controls="panel-po" aria-selected="true" tabindex="0"><span data-i18n="ui.po"></span> <span id="tab-po-count" class="badge badge-light">0</span></button>
+          <button id="tab-items" type="button" class="nav-link small px-1" role="tab" data-session-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1"><span data-i18n="ui.items"></span> <span id="tab-items-count" class="badge badge-light">0</span></button>
+          <button id="tab-boxes" type="button" class="nav-link small px-1" role="tab" data-session-tab="boxes" aria-controls="panel-boxes" aria-selected="false" tabindex="-1"><span data-i18n="ui.boxes"></span></button>
+          <button id="tab-sync" type="button" class="nav-link small px-1" role="tab" data-session-tab="sync" aria-controls="panel-sync" aria-selected="false" tabindex="-1"><span data-i18n="ui.tab_sync"></span> <span id="tab-sync-count" class="badge badge-light">0</span></button>
+        </div>
+        <section id="panel-po" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-po"><div id="po-list" class="table-responsive"></div></section>
+        <section id="panel-items" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-items" hidden><div id="item-list" class="table-responsive"></div></section>
+        <section id="panel-boxes" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-boxes" hidden>
+          <div class="btn-group btn-group-sm d-flex mb-3" role="group" data-i18n-aria="ui.box_filters">
+            <button type="button" class="btn btn-primary flex-fill" data-box-filter="not-scanned" aria-pressed="true"><span data-i18n="ui.box_not_scanned"></span> <span id="box-not-scanned-count" class="badge badge-light">0</span></button>
+            <button type="button" class="btn btn-default flex-fill" data-box-filter="scanning" aria-pressed="false"><span data-i18n="ui.box_scanning"></span> <span id="box-scanning-count" class="badge badge-light">0</span></button>
+            <button type="button" class="btn btn-default flex-fill" data-box-filter="completed" aria-pressed="false"><span data-i18n="ui.box_completed"></span> <span id="box-completed-count" class="badge badge-light">0</span></button>
+          </div>
+          <div class="d-flex mb-3"><label for="box-search" class="sr-only" data-i18n="ui.box_search"></label><input id="box-search" type="search" class="form-control mr-2" data-i18n-placeholder="ui.box_search"><button id="clear-box-search" type="button" class="btn btn-default" data-i18n-aria="ui.clear_filter" data-i18n-title="ui.clear_filter"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"></path></svg></button></div>
+          <div id="box-list" class="table-responsive"></div>
+        </section>
+        <section id="panel-sync" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-sync" hidden>
+          <p id="sync-status" class="text-muted" role="status" aria-live="polite"></p>
+          <div id="scan-list" class="table-responsive"></div>
+          <div id="sync-actions" class="mt-3" hidden>
+            <div class="form-group"><label for="booking-select" data-i18n="ui.booking_ids"></label><select id="booking-select" class="form-control"></select></div>
+            <div class="d-flex flex-wrap">
+              <button id="refresh-booking" type="button" class="btn btn-default mr-2 mb-2" data-i18n="ui.refresh_booking"></button>
+              <button id="rehydrate-plan" type="button" class="btn btn-default mr-2 mb-2" data-i18n="ui.rehydrate"></button>
+              <button id="delete-session" type="button" class="btn btn-danger mb-2" data-i18n="ui.delete"></button>
+            </div>
+          </div>
+        </section>
+        <div id="scan-dock-spacer" class="py-5 mb-5" aria-hidden="true" hidden></div>
+        <div id="scan-dock" class="fixed-bottom bg-white border-top shadow-sm py-2" hidden>
+          <div class="container-fluid"><div class="row justify-content-center"><div class="col-12 col-sm-11 col-md-10 col-lg-8 col-xl-7">
+            <div id="scan-controls" class="d-flex align-items-center mb-2"><label for="rfid-input" class="sr-only" data-i18n="ui.scan_rfid"></label><input id="rfid-input" class="form-control" autocomplete="off" spellcheck="false" data-i18n-placeholder="ui.scan_rfid"><button id="add-scan" type="button" class="btn btn-primary ml-2" data-i18n="ui.add_scan"></button></div>
+            <button id="complete-session" type="button" class="btn btn-primary btn-block" data-i18n="ui.complete"></button>
+          </div></div></div>
+        </div>
       </section>
     </div>
   </div>
