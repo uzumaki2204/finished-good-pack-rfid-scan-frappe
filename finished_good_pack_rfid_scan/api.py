@@ -59,9 +59,10 @@ def _input():
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
-def dispatch(operation: str):
+def dispatch(operation=None):
     """Return one stable envelope inside Frappe's standard `message` wrapper."""
     try:
+        operation = operation or frappe.request.args.get("operation") or frappe.form_dict.get("operation")
         handlers = READ if frappe.request.method == "GET" else WRITE if frappe.request.method == "POST" else {}
         if operation not in handlers:
             raise RfidError("error.method", 405)

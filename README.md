@@ -28,6 +28,8 @@ Nếu Desk chưa hiện biểu tượng, kiểm tra **Installed Apps** của đ�
 
 Khi API trả HTTP 500, nội dung response vẫn giữ thông báo chung; **Error Log** của Frappe ghi traceback trong bản `0.1.6` trở lên để quản trị viên truy nguyên lỗi.
 
+Bản `0.1.7` đọc operation từ query string trực tiếp để tương thích với cách Frappe bind request POST JSON.
+
 ## Luồng API
 
 Một endpoint Frappe: `/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=...`. GET: `device_check`, `active`, `history`, `session`, `preview_conflicts`. POST JSON: `start`, `preload`, `refresh_delta`, `rehydrate`, `complete`, `delete`. Mọi thao tác kiểm tra lại ID của Factory Device và dùng Company lấy từ thiết bị. Payload phản hồi nằm trong `message` chuẩn của Frappe, bên trong có `success`, `data`, `message` và `errorCode` khi lỗi.
