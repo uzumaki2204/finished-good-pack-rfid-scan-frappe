@@ -205,23 +205,43 @@
   const saveSession = async session => { state.session = session; await store.put('sessions', session); await store.put('meta', session.sessionId, 'currentSession'); await renderSession(); };
   const openSession = async sessionId => {
     resetSessionNavigation();
-    try { await saveSession(await api('session', { sessionId })); }
+    try { await saveSession(await api('session', { sessionId })); return true; }
     catch (error) {
-      const cached = await store.get('sessions', sessionId);
-      if (cached && cached.deviceId === state.device?.id && !navigator.onLine) await saveSession(cached);
-      else explain(error);
+      if (!navigator.onLine) {
+        try {
+          const cached = await store.get('sessions', sessionId);
+          if (cached && cached.deviceId === state.device?.id) { await saveSession(cached); return true; }
+        } catch { notice('error.offline_storage', 'danger'); return false; }
+      }
+      explain(error); return false;
     }
   };
-  const sessionCards = (target, rows, emptyKey) => {
+  const localScanCounts = async () => {
+    try {
+      const counts = new Map();
+      for (const scan of await store.all('scans')) counts.set(scan.sessionId, (counts.get(scan.sessionId) || 0) + 1);
+      return counts;
+    } catch { return new Map(); }
+  };
+  const sessionCards = (target, rows, emptyKey, active = false, scanCounts = new Map()) => {
     const parent = $(target); parent.replaceChildren();
     if (!rows.length) { const p = document.createElement('p'); p.className = 'text-muted'; p.textContent = i18n.text(emptyKey); parent.append(p); return; }
     for (const row of rows) {
       const card = document.createElement('div'); card.className = 'border rounded p-2 mb-2';
       const title = document.createElement('div'); title.textContent = (row.bookingIds || []).join(', ') || row.sessionId;
       const meta = document.createElement('small'); meta.className = 'text-muted d-block';
-      meta.textContent = [row.vehiclePlateNumber, i18n.text('ui.scan_count', { count: row.totalScannedCount || 0 })].filter(Boolean).join(' · ');
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-default btn-sm mt-2'; button.textContent = i18n.text('ui.resume'); button.onclick = () => openSession(row.sessionId);
-      card.append(title, meta, button); parent.append(card);
+      meta.textContent = [row.vehiclePlateNumber, i18n.text('ui.scan_count', { count: active ? (scanCounts.get(row.sessionId) ?? row.totalScannedCount ?? 0) : (row.totalScannedCount || 0) })].filter(Boolean).join(' · ');
+      const actions = document.createElement('div'); actions.className = 'd-flex flex-wrap align-items-center';
+      const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'btn btn-default btn-sm mr-2 mt-2'; openButton.textContent = i18n.text('ui.resume'); openButton.onclick = () => openSession(row.sessionId);
+      actions.append(openButton);
+      if (active) {
+        const completeButton = document.createElement('button'); completeButton.type = 'button'; completeButton.className = 'btn btn-primary btn-sm mr-2 mt-2'; completeButton.textContent = i18n.text('ui.complete');
+        completeButton.onclick = async () => { completeButton.disabled = true; try { if (await openSession(row.sessionId)) await beginCompletion(); } finally { completeButton.disabled = false; } };
+        const deleteButton = document.createElement('button'); deleteButton.type = 'button'; deleteButton.className = 'btn btn-danger btn-sm mt-2'; deleteButton.textContent = i18n.text('ui.delete');
+        deleteButton.onclick = async () => { deleteButton.disabled = true; try { await deleteSession(row.sessionId); } finally { deleteButton.disabled = false; } };
+        actions.append(completeButton, deleteButton);
+      }
+      card.append(title, meta, actions); parent.append(card);
     }
   };
   const loadHome = async () => {
@@ -229,13 +249,14 @@
     views('home-view');
     $('device-summary').textContent = `${state.device.deviceName} · ${state.device.companyName}`;
     try {
-      const [active, history] = await Promise.all([api('active'), api('history')]);
-      sessionCards('active-list', active, 'ui.empty_sessions');
+      const [active, history, scanCounts] = await Promise.all([api('active'), api('history'), localScanCounts()]);
+      sessionCards('active-list', active, 'ui.empty_sessions', true, scanCounts);
       sessionCards('history-list', history.items, 'ui.empty_history');
     } catch (error) {
       if (!navigator.onLine) {
-        const cached = (await store.all('sessions')).filter(s => s.deviceId === state.device.id);
-        sessionCards('active-list', cached.filter(s => s.sessionStatus === 'Active'), 'ui.empty_sessions');
+        const [sessions, scanCounts] = await Promise.all([store.all('sessions'), localScanCounts()]);
+        const cached = sessions.filter(s => s.deviceId === state.device.id);
+        sessionCards('active-list', cached.filter(s => s.sessionStatus === 'Active'), 'ui.empty_sessions', true, scanCounts);
         sessionCards('history-list', cached.filter(s => s.sessionStatus === 'Completed'), 'ui.empty_history');
       } else explain(error);
     }
@@ -326,13 +347,18 @@
     } catch (error) { explain(error); }
     finally { state.completionPending = false; for (const id of pendingControls) $(id).disabled = false; }
   };
-  const deleteSession = async () => {
-    if (!window.confirm(i18n.text('ui.confirm_delete'))) return;
+  const deleteSession = async sessionId => {
+    if (!sessionId || !window.confirm(i18n.text('ui.confirm_delete'))) return;
+    try { await api('delete', { sessionId }, 'POST'); }
+    catch (error) { explain(error); return; }
+    let cacheError = false;
     try {
-      await api('delete', { sessionId: state.session.sessionId }, 'POST');
-      await store.clearScans(state.session.sessionId); await store.remove('sessions', state.session.sessionId);
-      await store.remove('meta', 'currentSession'); state.session = null; resetSessionNavigation(); notice('success.session_deleted', 'success'); await loadHome();
-    } catch (error) { explain(error); }
+      await store.clearScans(sessionId);
+      await store.remove('sessions', sessionId);
+      if (await store.get('meta', 'currentSession') === sessionId) await store.remove('meta', 'currentSession');
+    } catch { cacheError = true; }
+    if (state.session?.sessionId === sessionId) { state.session = null; resetSessionNavigation(); }
+    await loadHome(); notice(cacheError ? 'error.offline_storage' : 'success.session_deleted', cacheError ? 'danger' : 'success');
   };
   const refreshBooking = async () => {
     const bookingId = value('booking-select');
@@ -400,7 +426,7 @@
     $('add-scan').onclick = addScan; $('rfid-input').onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); addScan(); } };
     $('complete-session').onclick = beginCompletion;
     $('cancel-completion').onclick = cancelCompletion; $('confirm-completion').onclick = complete;
-    $('delete-session').onclick = deleteSession;
+    $('delete-session').onclick = () => deleteSession(state.session?.sessionId);
     $('refresh-booking').onclick = refreshBooking; $('rehydrate-plan').onclick = rehydrate;
     for (const button of document.querySelectorAll('[data-session-tab]')) {
       button.onclick = () => selectSessionTab(button.dataset.sessionTab);

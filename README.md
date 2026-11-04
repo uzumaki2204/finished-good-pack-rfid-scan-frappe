@@ -36,6 +36,8 @@ Bản `0.1.9` giữ nguyên kích hoạt khi mở cài đặt thiết bị từ 
 
 Bản `0.1.10` chia dữ liệu phiên thành tab PO, Mã hàng, Thùng, Đồng bộ; bổ sung lọc và tìm số thùng. Trên màn hình quét, thanh RFID/hoàn thành cố định ở đáy. Biển số xe, tài xế và ghi chú được nhập ở bước hoàn thành; phiên đã hoàn thành hiển thị lại thông tin dưới dạng chỉ đọc.
 
+Bản `0.1.11` thêm nút **Hoàn thành** và **Xóa phiên** trên từng thẻ trong **Phiên đang quét**. Nút hoàn thành mở bước xác nhận của đúng phiên; nút xóa yêu cầu xác nhận trước khi gọi API. Số RFID trên thẻ đang quét lấy từ scan đã lưu trên tablet.
+
 ## Luồng API
 
 Một endpoint Frappe: `/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=...`. GET: `device_check`, `active`, `history`, `session`, `preview_conflicts`. POST JSON: `start`, `preload`, `refresh_delta`, `rehydrate`, `complete`, `delete`. Mọi thao tác kiểm tra lại ID của Factory Device và dùng Company lấy từ thiết bị. Payload phản hồi nằm trong `message` chuẩn của Frappe, bên trong có `success`, `data`, `message` và `errorCode` khi lỗi.
