@@ -109,7 +109,7 @@
           <button id="tab-sync" type="button" class="nav-link small px-1" role="tab" data-session-tab="sync" aria-controls="panel-sync" aria-selected="false" tabindex="-1"><span data-i18n="ui.tab_sync"></span> <span id="tab-sync-count" class="badge badge-light">0</span></button>
         </div>
         <section id="panel-po" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-po"><div id="po-list" class="table-responsive"></div></section>
-        <section id="panel-items" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-items" hidden><div id="item-list" class="table-responsive"></div></section>
+        <section id="panel-items" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-items" hidden><div id="item-list"></div></section>
         <section id="panel-boxes" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-boxes" hidden>
           <div class="btn-group btn-group-sm d-flex mb-3" role="group" data-i18n-aria="ui.box_filters">
             <button type="button" class="btn btn-primary flex-fill" data-box-filter="not-scanned" aria-pressed="true"><span data-i18n="ui.box_not_scanned"></span> <span id="box-not-scanned-count" class="badge badge-light">0</span></button>
@@ -139,6 +139,17 @@
           </div></div></div>
         </div>
       </section>
+    </div>
+  </div>
+  <div id="item-detail-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="item-detail-title" aria-hidden="true" tabindex="-1" hidden>
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+      <div class="modal-content">
+        <div class="modal-header align-items-center">
+          <h2 id="item-detail-title" class="modal-title h5 text-break"></h2>
+          <button id="close-item-detail" type="button" class="btn btn-default btn-sm ml-2" data-i18n-aria="ui.close" data-i18n-title="ui.close">&times;</button>
+        </div>
+        <div id="item-detail-body" class="modal-body"></div>
+      </div>
     </div>
   </div>
 </main>

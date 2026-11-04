@@ -9,6 +9,8 @@
   const BOX_FILTERS = ['not-scanned', 'scanning', 'completed'];
   const COMPLETION_LOCKED_CONTROLS = ['back-home', 'device-settings', 'refresh-booking', 'rehydrate-plan', 'delete-session'];
   const normalized = value => String(value || '').trim().toUpperCase();
+  const formatCount = count => Number(count || 0).toLocaleString(i18n.language === 'vi' ? 'vi-VN' : 'en-US');
+  const node = (tag, className = '', label = '') => { const element = document.createElement(tag); element.className = className; element.textContent = label; return element; };
   const value = id => $(id).value.trim();
   const show = (id, visible) => { $(id).hidden = !visible; };
   const lockCompletionNavigation = locked => { for (const id of COMPLETION_LOCKED_CONTROLS) $(id).disabled = locked; };
@@ -90,12 +92,86 @@
       && String(row.label || '').toLocaleLowerCase().includes(state.boxSearch));
     table('box-list', [['ui.boxes', row => row.label || i18n.text('ui.not_available')], ['ui.scanned', row => row.progress]], rows);
   };
+  const itemProgress = row => `${formatCount(row.scanned)}/${formatCount(row.total)}`;
+  const closeItemDetail = () => {
+    const modal = $('item-detail-modal');
+    if (modal.hidden) return;
+    modal.hidden = true; modal.classList.remove('show', 'd-block'); modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+    $('rfid-app').firstElementChild.inert = false;
+    document.getElementById('item-detail-backdrop')?.remove();
+    const trigger = state.itemDetailTrigger; state.itemDetailTrigger = null;
+    if (trigger?.isConnected) trigger.focus();
+  };
+  const renderItemDetail = row => {
+    const body = $('item-detail-body'); body.replaceChildren();
+    const summary = node('div', 'row mb-3');
+    const scanned = node('div', 'col-6'); scanned.append(node('div', 'border rounded p-2 h-100 font-weight-bold', itemProgress(row)));
+    const total = node('div', 'col-6');
+    const totalBox = node('div', 'border rounded p-2 h-100');
+    totalBox.append(node('small', 'text-muted d-block', i18n.text('ui.total_items')), node('strong', '', formatCount(row.total)));
+    total.append(totalBox); summary.append(scanned, total); body.append(summary);
+    for (const market of row.markets) {
+      const section = node('section', 'border rounded p-2 mb-3');
+      const heading = node('div', 'd-flex justify-content-between align-items-center mb-2');
+      heading.append(node('strong', 'text-break mr-2', [market.code, market.name].filter(Boolean).join(' - ') || i18n.text('ui.not_available')),
+        node('strong', 'text-nowrap', itemProgress(market)));
+      section.append(heading);
+      for (const variant of market.variants) {
+        const card = node('div', 'border rounded p-2 mb-2');
+        const top = node('div', 'd-flex justify-content-between align-items-center mb-2');
+        top.append(node('small', 'text-muted', i18n.text('ui.color_size')), node('strong', 'text-nowrap', itemProgress(variant)));
+        const color = node('div', 'd-flex flex-wrap');
+        color.append(node('small', 'text-muted mr-2', i18n.text('ui.color')),
+          node('span', 'text-break', [variant.colorCode, variant.colorName].filter(Boolean).join(' - ') || i18n.text('ui.not_available')));
+        const size = node('div', 'd-flex flex-wrap');
+        size.append(node('small', 'text-muted mr-2', i18n.text('ui.size')),
+          node('span', 'text-break', [variant.sizeCode, variant.sizeName].filter(Boolean).join(' - ') || i18n.text('ui.not_available')));
+        card.append(top, color, size);
+        if (variant.qtyPerSet > 0) card.append(node('small', 'text-muted d-block mt-1', i18n.text('ui.qty_per_set', { count: formatCount(variant.qtyPerSet) })));
+        section.append(card);
+      }
+      body.append(section);
+    }
+  };
+  const openItemDetail = (row, trigger) => {
+    state.itemDetailTrigger = trigger;
+    $('item-detail-title').textContent = i18n.text('ui.item_details', { item: row.label || i18n.text('ui.not_available') });
+    renderItemDetail(row);
+    const modal = $('item-detail-modal');
+    modal.hidden = false; modal.classList.add('show', 'd-block'); modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    const backdrop = node('div', 'modal-backdrop show'); backdrop.id = 'item-detail-backdrop';
+    document.body.append(backdrop);
+    $('rfid-app').firstElementChild.inert = true;
+    $('close-item-detail').focus();
+  };
+  const renderItemList = rows => {
+    const parent = $('item-list'); parent.replaceChildren();
+    if (!rows.length) { parent.append(node('p', 'text-muted', i18n.text('ui.empty_rows'))); return; }
+    for (const row of rows) {
+      const card = node('article', 'border rounded p-2 mb-2');
+      const layout = node('div', 'd-flex justify-content-between align-items-start');
+      const meta = node('div', 'text-break mr-2');
+      meta.append(node('strong', 'd-block', row.label || i18n.text('ui.not_available')),
+        node('small', 'text-muted d-block', i18n.text('ui.item_po', { po: row.orderNo || i18n.text('ui.not_available') })),
+        node('small', 'text-muted d-block', i18n.text('ui.item_booking', { booking: row.bookingId })),
+        node('small', 'text-muted d-block', i18n.text('ui.item_box_variant_summary', {
+          completed: formatCount(row.completedBoxes), boxes: formatCount(row.boxCount), variants: formatCount(row.variantCount),
+        })));
+      const actions = node('div', 'text-right');
+      actions.append(node('strong', 'd-block text-nowrap', itemProgress(row)));
+      const button = node('button', 'btn btn-default btn-sm mt-1', i18n.text('ui.item_detail_button'));
+      button.type = 'button'; button.onclick = () => openItemDetail(row, button);
+      actions.append(button); layout.append(meta, actions); card.append(layout); parent.append(card);
+    }
+  };
   const renderSelectedSessionTab = () => {
     const rows = state.sessionRows;
     if (!rows) return;
     const progressColumns = label => [[label, row => row.label || i18n.text('ui.not_available')], ['ui.scanned', row => row.progress]];
     if (state.activeSessionTab === 'po') table('po-list', progressColumns('ui.po'), rows.po);
-    else if (state.activeSessionTab === 'items') table('item-list', progressColumns('ui.items'), rows.items);
+    else if (state.activeSessionTab === 'items') renderItemList(rows.items);
     else if (state.activeSessionTab === 'boxes') renderBoxList();
     else {
       $('sync-status').textContent = i18n.text(state.session?.sessionStatus === 'Completed' ? 'ui.sync_complete' : 'ui.sync_local', { count: rows.scans.length });
@@ -143,6 +219,7 @@
   const renderSession = async () => {
     const s = state.session;
     if (!s) return;
+    closeItemDetail();
     if (state.renderedSessionId !== s.sessionId) {
       state.renderedSessionId = s.sessionId;
       state.activeSessionTab = 'po'; state.activeBoxFilter = 'not-scanned'; state.boxSearch = ''; state.completing = false;
@@ -153,9 +230,10 @@
     const local = s.sessionStatus === 'Completed' ? [] : await scansForSession();
     const scans = s.sessionStatus === 'Completed' ? (s.scannedItems || []) : local;
     const plannedItems = (s.preloadedBookings || []).flatMap(b => (b.items || []).map(item => ({ ...item, bookingId: b.bookingId })));
+    const plannedById = new Map(plannedItems.map(item => [`${item.bookingId}|${item.finishedGoodPackDetailId}`, item]));
     const localBoxes = new Set(scans.map(scan => `${scan.bookingId}|${scan.orderNo}|${scan.doNo}|${scan.dispPackNum}`).filter(x => !x.endsWith('|'))).size;
     const metalCount = scans.filter(scan => {
-      const item = plannedItems.find(x => x.bookingId === scan.bookingId && x.finishedGoodPackDetailId === scan.finishedGoodPackDetailId);
+      const item = plannedById.get(`${scan.bookingId}|${scan.finishedGoodPackDetailId}`);
       return ['Y', 'YES', 'TRUE', '1'].includes(normalized(item?.isMetalCheck || scan.isMetalCheck));
     }).length;
     $('session-summary').textContent = `${i18n.text('ui.scan_count', { count: scans.length })} · ${i18n.text('ui.metal_checked')}: ${metalCount} · ${i18n.text('ui.box_progress', { scanned: localBoxes, planned: s.plannedBoxCount || 0 })}`;
@@ -176,20 +254,57 @@
     const selectedBooking = bookingSelect.value;
     bookingSelect.replaceChildren(...(s.bookingIds || []).map(id => { const option = document.createElement('option'); option.value = id; option.textContent = id; return option; }));
     if ((s.bookingIds || []).includes(selectedBooking)) bookingSelect.value = selectedBooking;
-    const bookingRows = (s.preloadedBookings || []).flatMap(b => b.items || []);
     const scannedIds = new Set(scans.map(x => `${x.bookingId}|${x.finishedGoodPackDetailId}`));
     const po = new Map(), items = new Map(), boxes = new Map();
-    for (const item of bookingRows) {
-      const booking = (s.preloadedBookings || []).find(b => b.items?.includes(item));
+    for (const booking of s.preloadedBookings || []) {
       const bookingId = booking?.bookingId || '';
-      const found = scannedIds.has(`${bookingId}|${item.finishedGoodPackDetailId}`);
-      for (const [map, signature, label] of [[po, `${bookingId}|${item.orderNo}`, item.orderNo], [items, `${bookingId}|${item.itemCode}|${item.colorCode}|${item.sizeCode}`, [item.itemCode, item.colorCode, item.sizeCode].filter(Boolean).join(' / ')], [boxes, `${bookingId}|${item.doNo}|${item.dispPackNum}`, item.dispPackNum]]) {
-        const row = map.get(signature) || { label, total: 0, scanned: 0 };
-        row.total += 1; row.scanned += Number(found); map.set(signature, row);
+      for (const item of booking.items || []) {
+        const found = scannedIds.has(`${bookingId}|${item.finishedGoodPackDetailId}`);
+        const poKey = JSON.stringify([bookingId, item.orderNo || '']);
+        const boxKey = JSON.stringify([bookingId, item.orderNo || '', item.doNo || '', item.dispPackNum || '']);
+        for (const [map, signature, label] of [[po, poKey, item.orderNo], [boxes, boxKey, item.dispPackNum]]) {
+          const row = map.get(signature) || { label, total: 0, scanned: 0 };
+          row.total += 1; row.scanned += Number(found); map.set(signature, row);
+        }
+        const itemCode = item.itemCode || item.sampleCode || '';
+        const itemKey = JSON.stringify([bookingId, item.orderNo || '', itemCode]);
+        let row = items.get(itemKey);
+        if (!row) {
+          row = { label: itemCode, bookingId, orderNo: item.orderNo || '', total: 0, scanned: 0,
+            boxKeys: new Set(), variantKeys: new Set(), markets: new Map() };
+          items.set(itemKey, row);
+        }
+        row.total += 1; row.scanned += Number(found); row.boxKeys.add(boxKey);
+        const marketKey = JSON.stringify([item.marketCode || '', item.marketName || '']);
+        let market = row.markets.get(marketKey);
+        if (!market) {
+          market = { code: item.marketCode || '', name: item.marketName || '', total: 0, scanned: 0, variants: new Map() };
+          row.markets.set(marketKey, market);
+        }
+        market.total += 1; market.scanned += Number(found);
+        const variantKey = JSON.stringify([item.colorCode || '', item.colorName || '', item.sizeCode || '', item.sizeName || '']);
+        row.variantKeys.add(variantKey);
+        let variant = market.variants.get(variantKey);
+        if (!variant) {
+          variant = { colorCode: item.colorCode || '', colorName: item.colorName || '', sizeCode: item.sizeCode || '',
+            sizeName: item.sizeName || '', qtyPerSet: Number(item.qtyPerSet || 0), total: 0, scanned: 0 };
+          market.variants.set(variantKey, variant);
+        } else if (variant.qtyPerSet !== Number(item.qtyPerSet || 0)) variant.qtyPerSet = 0;
+        variant.total += 1; variant.scanned += Number(found);
       }
     }
     const progress = rows => [...rows.values()].map(row => ({ ...row, progress: `${row.scanned}/${row.total}` }));
-    state.sessionRows = { po: progress(po), items: progress(items), boxes: progress(boxes), scans, editable };
+    const itemRows = [...items.values()].map(row => ({
+      label: row.label, bookingId: row.bookingId, orderNo: row.orderNo, total: row.total, scanned: row.scanned,
+      boxCount: row.boxKeys.size,
+      completedBoxes: [...row.boxKeys].filter(key => boxes.get(key)?.scanned === boxes.get(key)?.total).length,
+      variantCount: row.variantKeys.size,
+      markets: [...row.markets.values()].map(market => ({
+        code: market.code, name: market.name, total: market.total, scanned: market.scanned,
+        variants: [...market.variants.values()],
+      })),
+    }));
+    state.sessionRows = { po: progress(po), items: itemRows, boxes: progress(boxes), scans, editable };
     $('tab-po-count').textContent = String(state.sessionRows.po.length);
     $('tab-items-count').textContent = String(state.sessionRows.items.length);
     $('tab-sync-count').textContent = String(scans.length);
@@ -197,6 +312,7 @@
     selectSessionTab(state.activeSessionTab);
   };
   const resetSessionNavigation = () => {
+    closeItemDetail();
     state.renderedSessionId = null; state.activeSessionTab = 'po'; state.activeBoxFilter = 'not-scanned';
     state.boxSearch = ''; state.sessionRows = null; state.completing = false;
     lockCompletionNavigation(false);
@@ -438,6 +554,12 @@
     }
     $('box-search').oninput = () => { state.boxSearch = value('box-search').toLocaleLowerCase(); renderBoxList(); };
     $('clear-box-search').onclick = () => { $('box-search').value = ''; state.boxSearch = ''; renderBoxList(); $('box-search').focus(); };
+    $('close-item-detail').onclick = closeItemDetail;
+    $('item-detail-modal').onclick = event => { if (event.target === $('item-detail-modal')) closeItemDetail(); };
+    $('item-detail-modal').onkeydown = event => {
+      if (event.key === 'Escape') { event.preventDefault(); closeItemDetail(); }
+      else if (event.key === 'Tab') { event.preventDefault(); $('close-item-detail').focus(); }
+    };
     try {
       state.device = await store.get('meta', 'device');
       renderDeviceInfo();
