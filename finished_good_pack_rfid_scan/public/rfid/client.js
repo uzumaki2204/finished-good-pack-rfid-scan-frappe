@@ -3,7 +3,7 @@
   const i18n = window.RfidI18n;
   const store = window.RfidOffline;
   const $ = id => document.getElementById(id);
-  const state = { device: null, session: null, renderedSessionId: null, stream: null, cameraTimer: null };
+  const state = { device: null, session: null, renderedSessionId: null, stream: null, cameraTimer: null, returnView: null };
   const normalized = value => String(value || '').trim().toUpperCase();
   const value = id => $(id).value.trim();
   const show = (id, visible) => { $(id).hidden = !visible; };
@@ -14,6 +14,7 @@
     node.textContent = i18n.text(key, values);
     node.hidden = false;
   };
+  const clearNotice = () => { $('notice').hidden = true; $('notice').textContent = ''; };
   const explain = error => {
     if (error?.code && (window.FinishedGoodRfidCatalog?.[i18n.language] || {})[error.code]) {
       notice(error.code, 'danger');
@@ -52,6 +53,7 @@
     const badge = $('device-status-badge');
     badge.className = `indicator-pill ${state.device ? 'green' : 'orange'}`;
     badge.textContent = i18n.text(state.device ? 'ui.device_activated' : 'ui.device_not_activated');
+    $('return-to-app').hidden = !state.device;
     $('device-name-label').textContent = state.device?.deviceName || i18n.text('ui.not_available');
     $('device-company-label').textContent = state.device?.companyName || i18n.text('ui.not_available');
   };
@@ -164,8 +166,13 @@
   const activate = async id => {
     try {
       const device = await api('device_check', { deviceId: id });
+      if (state.session && state.device?.id && state.device.id !== device.id) throw { code: 'error.device_session' };
       state.device = device; await store.put('meta', device, 'device');
-      $('device-id').value = device.id; renderDeviceInfo(); stopCamera(); notice('success.device_ready', 'success'); await loadHome();
+      $('device-id').value = device.id; renderDeviceInfo(); stopCamera(); notice('success.device_ready', 'success');
+      const returnView = state.returnView;
+      state.returnView = null;
+      if (returnView === 'session-view' && state.session) await renderSession();
+      else await loadHome();
     } catch (error) { explain(error); }
   };
   const start = async () => {
@@ -259,7 +266,20 @@
     $('check-device').onclick = () => activate(value('device-id'));
     $('device-id').onkeydown = event => { if (event.key === 'Enter') activate(value('device-id')); };
     $('scan-qr').onclick = scanQr;
-    $('change-device').onclick = async () => { stopCamera(); state.device = null; state.session = null; renderDeviceInfo(); $('device-id').value = ''; await store.remove('meta', 'device'); await store.remove('meta', 'currentSession'); views('device-view'); };
+    $('device-settings').onclick = () => {
+      if (!state.device) { views('device-view'); $('device-id').focus(); return; }
+      if (!state.returnView) state.returnView = $('session-view').hidden ? 'home-view' : 'session-view';
+      $('device-id').value = state.device.id;
+      renderDeviceInfo(); clearNotice(); views('device-view');
+    };
+    $('return-to-app').onclick = async () => {
+      const returnView = state.returnView;
+      state.returnView = null;
+      clearNotice();
+      if (returnView === 'session-view' && state.session) await renderSession();
+      else await loadHome();
+    };
+    $('change-device').onclick = async () => { stopCamera(); state.returnView = null; state.device = null; state.session = null; renderDeviceInfo(); $('device-id').value = ''; await store.remove('meta', 'device'); await store.remove('meta', 'currentSession'); clearNotice(); views('device-view'); };
     $('start-session').onclick = start;
     $('refresh-active').onclick = loadHome; $('refresh-history').onclick = loadHome;
     $('back-home').onclick = async () => { state.session = null; await store.remove('meta', 'currentSession'); await loadHome(); };
