@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timezone
 
 from finished_good_pack_rfid_scan.errors import RfidError
-from finished_good_pack_rfid_scan.plan import booking_delta, resolve_booking, validate_scans
+from finished_good_pack_rfid_scan.plan import booking_delta, clean_rfid, resolve_booking, rfid_key, validate_scans
 
 
 def fixture():
@@ -37,6 +37,20 @@ class PlanTest(unittest.TestCase):
         with self.assertRaises(RfidError) as error:
             validate_scans([scan, scan], [plan])
         self.assertEqual(error.exception.key, "error.scan_duplicate")
+
+    def test_rfid_key_matches_dotnet_control_filter_and_length_limit(self):
+        self.assertEqual(clean_rfid("\x00 rfid-1\r\n"), "rfid-1")
+        self.assertEqual(rfid_key("\x00 rfid-1\r\n"), "RFID-1")
+        self.assertEqual(rfid_key("rfid\t1"), "RFID\t1")
+        self.assertEqual(rfid_key("x" * 201), "X" * 200)
+
+    def test_server_snapshot_match_ignores_control_characters(self):
+        plan = fixture()
+        item = plan["items"][0]
+        scan = {"bookingId": plan["bookingId"], "finishedGoodPackDetailId": item["finishedGoodPackDetailId"],
+                "rfid": "\x00rfid-\n1", "scannedAtUtc": datetime.now(timezone.utc).isoformat()}
+        resolved = validate_scans([scan], [plan])
+        self.assertEqual(resolved[0]["finishedGoodPackDetailId"], item["finishedGoodPackDetailId"])
 
     def test_rejects_cross_booking_detail_substitution(self):
         plan = fixture()

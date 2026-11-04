@@ -5,10 +5,16 @@
   const $ = id => document.getElementById(id);
   const state = { device: null, session: null, renderedSessionId: null, stream: null, cameraTimer: null, returnView: null,
     activeSessionTab: 'po', activeBoxFilter: 'not-scanned', boxSearch: '', sessionRows: null, completing: false, completionPending: false };
+  const SCAN_COMMIT_DELAY_MS = 60;
+  let scannerCommitTimer = null;
+  let lastFocusedRfidKeyAt = 0;
+  let focusedRfidKeyBurst = 0;
+  let scanQueue = Promise.resolve();
   const SESSION_TABS = ['po', 'items', 'boxes', 'sync'];
   const BOX_FILTERS = ['not-scanned', 'scanning', 'completed'];
   const COMPLETION_LOCKED_CONTROLS = ['back-home', 'device-settings', 'refresh-booking', 'rehydrate-plan', 'delete-session'];
   const normalized = value => String(value || '').trim().toUpperCase();
+  const normalizedRfid = value => String(value || '').replace(/[\u0000-\u0008\u000A-\u001F\u007F-\u009F]/g, '').trim().slice(0, 200).toUpperCase();
   const formatCount = count => Number(count || 0).toLocaleString(i18n.language === 'vi' ? 'vi-VN' : 'en-US');
   const node = (tag, className = '', label = '') => { const element = document.createElement(tag); element.className = className; element.textContent = label; return element; };
   const value = id => $(id).value.trim();
@@ -187,8 +193,13 @@
       if (rows.editable) columns.push(['ui.delete', row => {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-default btn-sm'; button.textContent = i18n.text('ui.remove_scan');
         button.onclick = async () => {
-          try { await store.remove('scans', `${state.session.sessionId}|${normalized(row.rfid)}`); notice('success.scan_removed', 'success'); await renderSession(); }
-          catch { notice('error.offline_storage', 'danger'); }
+          try {
+            const storedRows = await store.all('scans');
+            const stored = storedRows.find(item => item.sessionId === state.session.sessionId
+              && item.payload?.finishedGoodPackDetailId === row.finishedGoodPackDetailId);
+            if (stored) await store.remove('scans', stored.key);
+            notice('success.scan_removed', 'success'); await renderSession();
+          } catch { notice('error.offline_storage', 'danger'); }
         };
         return button;
       }]);
@@ -452,29 +463,151 @@
       const confirmConflicts = preview.sessions.length > 0;
       if (confirmConflicts && !window.confirm(i18n.text('ui.confirm_conflict'))) return;
       const result = await api('start', { bookingIds, confirmConflicts }, 'POST');
-      resetSessionNavigation(); await saveSession(result.session); notice('success.session_started', 'success');
+      resetScannerBuffer(); resetSessionNavigation(); await saveSession(result.session); notice('success.session_started', 'success');
     } catch (error) { explain(error); }
   };
-  const addScan = async () => {
-    if (!state.session || state.session.sessionStatus !== 'Active' || state.completing) return;
-    const rfid = value('rfid-input'), normalizedRfid = normalized(rfid);
+  const addScan = async (rfid, sessionId, focusAfter = false) => {
+    if (!state.session || state.session.sessionId !== sessionId || state.session.sessionStatus !== 'Active'
+      || state.completing || state.completionPending) return;
+    const lookupRfid = normalizedRfid(rfid);
+    if (!lookupRfid) return;
     const bookings = state.session.preloadedBookings || [];
-    const matches = bookings.flatMap(b => (b.items || []).filter(x => normalized(x.rfid) === normalizedRfid).map(item => ({ booking: b, item })));
-    if (!normalizedRfid || matches.length !== 1) return notice('error.scan_not_in_plan', 'danger');
-    const scans = await scansForSession();
-    if (scans.some(x => normalized(x.rfid) === normalizedRfid)) return notice('error.scan_duplicate', 'danger');
+    const matches = bookings.flatMap(b => (b.items || []).filter(x => normalizedRfid(x.rfid) === lookupRfid).map(item => ({ booking: b, item })));
+    if (!matches.length) return notice('error.scan_not_in_plan', 'danger');
+    if (matches.length > 1) return notice('error.scan_ambiguous_in_plan', 'danger');
+    let scans;
+    try { scans = await scansForSession(); }
+    catch { return notice('error.offline_storage', 'danger'); }
+    if (state.session?.sessionId !== sessionId) return;
+    if (scans.some(x => normalizedRfid(x.rfid) === lookupRfid)) return notice('error.scan_duplicate', 'danger');
     const { booking, item } = matches[0];
     const scan = { bookingId: booking.bookingId, finishedGoodPackDetailId: item.finishedGoodPackDetailId,
       rfid: item.rfid, orderNo: item.orderNo, doNo: item.doNo, dispPackNum: item.dispPackNum, scannedAtUtc: new Date().toISOString() };
     try {
-      await store.put('scans', { key: `${state.session.sessionId}|${normalizedRfid}`, sessionId: state.session.sessionId, payload: scan });
-      $('rfid-input').value = ''; $('rfid-input').focus(); notice('success.scan_saved', 'success'); await renderSession();
+      await store.put('scans', { key: `${sessionId}|${lookupRfid}`, sessionId, payload: scan });
+      if (state.session?.sessionId !== sessionId) return;
+      const input = $('rfid-input');
+      if (normalizedRfid(input.value) === lookupRfid) input.value = '';
+      if (focusAfter) input.focus();
+      notice('success.scan_saved', 'success'); await renderSession();
     } catch { notice('error.offline_storage', 'danger'); }
+  };
+  const canCaptureScans = () => state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending
+    && !$('session-view').hidden && !$('scan-dock').hidden && $('item-detail-modal').hidden;
+  const enqueueScan = (rfid, focusAfter = false, sessionId = state.session?.sessionId) => {
+    if (!sessionId) return Promise.resolve();
+    scanQueue = scanQueue.catch(() => {}).then(() => addScan(rfid, sessionId, focusAfter));
+    return scanQueue;
+  };
+  const clearScannerCommitTimer = () => {
+    if (scannerCommitTimer !== null) window.clearTimeout(scannerCommitTimer);
+    scannerCommitTimer = null;
+  };
+  const resetFocusedRfidKeyBurst = () => {
+    lastFocusedRfidKeyAt = 0;
+    focusedRfidKeyBurst = 0;
+  };
+  const commitScannerInput = (focusAfter = false) => {
+    clearScannerCommitTimer();
+    resetFocusedRfidKeyBurst();
+    if (!canCaptureScans()) return;
+    const input = $('rfid-input');
+    const rfid = input.value;
+    if (!normalizedRfid(rfid)) return;
+    const sessionId = state.session.sessionId;
+    input.value = '';
+    void enqueueScan(rfid, focusAfter, sessionId);
+  };
+  const resetScannerBuffer = () => {
+    clearScannerCommitTimer(); resetFocusedRfidKeyBurst();
+    $('rfid-input').value = '';
+  };
+  const queueScannerCommit = () => {
+    clearScannerCommitTimer();
+    scannerCommitTimer = window.setTimeout(() => {
+      scannerCommitTimer = null;
+      commitScannerInput();
+    }, SCAN_COMMIT_DELAY_MS);
+  };
+  const appendScannerText = chunk => {
+    if (!canCaptureScans()) return;
+    const raw = String(chunk || '');
+    if (!raw) return;
+    const hasTerminator = /[\r\n\t]/.test(raw);
+    const sanitized = raw.replace(/[\r\n\t]+/g, '');
+    if (sanitized) $('rfid-input').value = `${$('rfid-input').value || ''}${sanitized}`;
+    if (hasTerminator) commitScannerInput();
+    else if (sanitized) queueScannerCommit();
+  };
+  const shouldCaptureScannerKeys = event => {
+    if (!canCaptureScans() || event.target === $('rfid-input')) return false;
+    const target = event.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return false;
+    return true;
+  };
+  const handleScannerKeyDown = event => {
+    if (event.target === $('rfid-input')) {
+      if ((event.key === 'Enter' || event.key === 'Tab') && normalizedRfid(event.target.value)) {
+        event.preventDefault(); event.stopPropagation(); commitScannerInput(true);
+      } else if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing) {
+        const now = performance.now();
+        focusedRfidKeyBurst = now - lastFocusedRfidKeyAt <= SCAN_COMMIT_DELAY_MS ? focusedRfidKeyBurst + 1 : 1;
+        lastFocusedRfidKeyAt = now;
+        if (focusedRfidKeyBurst >= 4) queueScannerCommit();
+      } else if (event.key === 'Backspace') {
+        focusedRfidKeyBurst = 0; lastFocusedRfidKeyAt = 0;
+      }
+      return;
+    }
+    if (!shouldCaptureScannerKeys(event)) return;
+    const input = $('rfid-input');
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      if (!normalizedRfid(input.value)) return;
+      event.preventDefault(); event.stopPropagation(); commitScannerInput(); return;
+    }
+    if (event.key === 'Backspace') {
+      if (!input.value) return;
+      event.preventDefault(); event.stopPropagation(); input.value = input.value.slice(0, -1); queueScannerCommit(); return;
+    }
+    if (event.key.length !== 1 || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
+    event.preventDefault(); event.stopPropagation(); appendScannerText(event.key);
+  };
+  const handleScannerBeforeInput = event => {
+    if (!canCaptureScans()) return;
+    const text = typeof event.data === 'string' ? event.data : '';
+    if (event.target === $('rfid-input')) {
+      if (event.inputType === 'insertLineBreak') {
+        event.preventDefault(); commitScannerInput(true);
+      } else if (text && /[\r\n\t]/.test(text)) {
+        event.preventDefault(); appendScannerText(text);
+      }
+      return;
+    }
+    if (!shouldCaptureScannerKeys(event) || !text) return;
+    event.preventDefault(); event.stopPropagation(); appendScannerText(text);
+  };
+  const handleScannerPaste = event => {
+    if (!canCaptureScans()) return;
+    if (event.target !== $('rfid-input') && !shouldCaptureScannerKeys(event)) return;
+    const text = event.clipboardData?.getData('text');
+    if (!text) return;
+    event.preventDefault();
+    if (event.target !== $('rfid-input')) event.stopPropagation();
+    appendScannerText(text);
   };
   const beginCompletion = async () => {
     if (!state.session || state.session.sessionStatus !== 'Active') return;
     if (!navigator.onLine) return notice('ui.network_required', 'warning');
     try {
+      await scanQueue;
+      const beforeCount = (await scansForSession()).length;
+      const pendingRfid = normalizedRfid($('rfid-input').value);
+      if (pendingRfid) {
+        commitScannerInput();
+        await scanQueue;
+        const afterPendingScan = await scansForSession();
+        if (afterPendingScan.length === beforeCount) return;
+      }
       const scans = await scansForSession();
       if (!scans.length) return notice('error.scan_required', 'danger');
       $('completion-vehicle').value = state.session.vehiclePlateNumber || '';
@@ -578,6 +711,7 @@
     $('device-id').onkeydown = event => { if (event.key === 'Enter') activate(value('device-id')); };
     $('scan-qr').onclick = scanQr;
     $('device-settings').onclick = () => {
+      resetScannerBuffer();
       if (!state.device) { views('device-view'); $('device-id').focus(); return; }
       if (!state.returnView) state.returnView = $('session-view').hidden ? 'home-view' : 'session-view';
       $('device-id').value = state.device.id;
@@ -590,11 +724,14 @@
       if (returnView === 'session-view' && state.session) await renderSession();
       else await loadHome();
     };
-    $('change-device').onclick = async () => { stopCamera(); state.returnView = null; state.device = null; state.session = null; resetSessionNavigation(); renderDeviceInfo(); $('device-id').value = ''; await store.remove('meta', 'device'); await store.remove('meta', 'currentSession'); clearNotice(); views('device-view'); };
+    $('change-device').onclick = async () => { resetScannerBuffer(); stopCamera(); state.returnView = null; state.device = null; state.session = null; resetSessionNavigation(); renderDeviceInfo(); $('device-id').value = ''; await store.remove('meta', 'device'); await store.remove('meta', 'currentSession'); clearNotice(); views('device-view'); };
     $('start-session').onclick = start;
     $('refresh-active').onclick = loadHome; $('refresh-history').onclick = loadHome;
-    $('back-home').onclick = async () => { state.session = null; resetSessionNavigation(); await store.remove('meta', 'currentSession'); await loadHome(); };
-    $('add-scan').onclick = addScan; $('rfid-input').onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); addScan(); } };
+    $('back-home').onclick = async () => { resetScannerBuffer(); state.session = null; resetSessionNavigation(); await store.remove('meta', 'currentSession'); await loadHome(); };
+    $('add-scan').onclick = () => { void enqueueScan($('rfid-input').value, true); };
+    document.addEventListener('keydown', handleScannerKeyDown);
+    document.addEventListener('beforeinput', handleScannerBeforeInput);
+    document.addEventListener('paste', handleScannerPaste);
     $('complete-session').onclick = beginCompletion;
     $('cancel-completion').onclick = cancelCompletion; $('confirm-completion').onclick = complete;
     $('delete-session').onclick = () => deleteSession(state.session?.sessionId);

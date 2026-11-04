@@ -1,6 +1,6 @@
 {
   "app_name": "finished_good_pack_rfid_scan",
-  "app_version": "0.1.16",
+  "app_version": "0.1.17",
   "frappe": {"minimum_version": "16.53.0", "branch": "version-16"},
   "required_apps": {"factory_management": "0.1.76"}
 }

@@ -11,7 +11,14 @@ import frappe
 from finished_good_pack_rfid_scan.access import approved_device, device_data
 from finished_good_pack_rfid_scan.errors import RfidError
 from finished_good_pack_rfid_scan.i18n import message
-from finished_good_pack_rfid_scan.plan import booking_delta, key, snapshot_version, text, validate_scans
+from finished_good_pack_rfid_scan.plan import (
+    booking_delta,
+    key,
+    rfid_key,
+    snapshot_version,
+    text,
+    validate_scans,
+)
 from finished_good_pack_rfid_scan.soap import preload_booking
 
 
@@ -370,7 +377,7 @@ def complete(device_id, session_id, vehicle, driver, note, scans):
     frappe.db.sql("SELECT name FROM `tabCompany` WHERE name=%s FOR UPDATE", (device.company,))
     duplicate_count = 0
     for scan in resolved:
-        normalized_rfid = key(scan["rfid"])
+        normalized_rfid = rfid_key(scan["rfid"])
         if frappe.db.exists(SCAN, {"company": device.company, "normalized_rfid": normalized_rfid}):
             duplicate_count += 1
         detail_id = scan["finishedGoodPackDetailId"]

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import unicodedata
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -16,6 +17,16 @@ def text(value):
 
 def key(value):
     return text(value).upper()
+
+
+def clean_rfid(value):
+    raw = str(value or "")
+    cleaned = "".join(char for char in raw if unicodedata.category(char) != "Cc" or char == "\t")
+    return cleaned.strip()[:200]
+
+
+def rfid_key(value):
+    return clean_rfid(value).upper()
 
 
 def stable_uuid(*parts):
@@ -82,10 +93,10 @@ def resolve_booking(company, booking, sources, packs, details_by_pack, market_lo
         market = market_lookup(market_code) or {}
         booking_detail_id = stable_uuid(company, "booking-detail", booking_id, source.get("innerContainerId"), source.get("usedPackNum"))
         for detail in details:
-            rfid = text(detail.get("rfid"))
+            rfid = clean_rfid(detail.get("rfid"))
             if not rfid:
                 continue
-            detail_id = stable_uuid(company, "pack-detail", pack.get("innerPackNum"), pack.get("orderNo"), pack.get("doNo"), detail.get("rfid"), detail.get("skuCode"), detail.get("colorCode"), detail.get("sizeCode"))
+            detail_id = stable_uuid(company, "pack-detail", pack.get("innerPackNum"), pack.get("orderNo"), pack.get("doNo"), rfid, detail.get("skuCode"), detail.get("colorCode"), detail.get("sizeCode"))
             items.append({
                 "bookingDetailId": booking_detail_id,
                 "finishedGoodPackDetailId": detail_id,
@@ -190,9 +201,10 @@ def validate_scans(scans, bookings):
             raise RfidError("error.scan_not_in_plan")
         booking, item = source
         rfid = text(scan.get("rfid"))
-        if not rfid or len(rfid) > 200 or key(rfid) != key(item.get("rfid")):
+        normalized_rfid = rfid_key(rfid)
+        if not rfid or len(rfid) > 200 or not normalized_rfid or normalized_rfid != rfid_key(item.get("rfid")):
             raise RfidError("error.scan_not_in_plan")
-        if (key(booking["bookingId"]), detail_id) in seen_details or key(rfid) in seen_rfids:
+        if (key(booking["bookingId"]), detail_id) in seen_details or normalized_rfid in seen_rfids:
             raise RfidError("error.scan_duplicate")
         try:
             occurred = datetime.fromisoformat(text(scan.get("scannedAtUtc")).replace("Z", "+00:00"))
@@ -201,7 +213,7 @@ def validate_scans(scans, bookings):
         except ValueError:
             raise RfidError("error.scan_invalid") from None
         seen_details.add((key(booking["bookingId"]), detail_id))
-        seen_rfids.add(key(rfid))
+        seen_rfids.add(normalized_rfid)
         normalized.append({
             **item,
             "bookingId": booking["bookingId"],
