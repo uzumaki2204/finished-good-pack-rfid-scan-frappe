@@ -66,6 +66,7 @@
   };
   const views = name => {
     for (const id of ['device-view', 'home-view', 'session-view']) show(id, id === name);
+    show('back-home', name === 'session-view');
   };
   const table = (target, columns, rows, emptyKey = 'ui.empty_rows') => {
     const parent = $(target);
@@ -233,7 +234,6 @@
       $('box-search').value = '';
     }
     views('session-view');
-    $('session-title').textContent = (s.bookingIds || []).join(', ') || s.sessionId;
     const local = s.sessionStatus === 'Completed' ? [] : await scansForSession();
     const scans = s.sessionStatus === 'Completed' ? (s.scannedItems || []) : local;
     const plannedItems = (s.preloadedBookings || []).flatMap(b => (b.items || []).map(item => ({ ...item, bookingId: b.bookingId })));

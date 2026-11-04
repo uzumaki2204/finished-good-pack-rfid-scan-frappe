@@ -11,8 +11,11 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8.8a15 15 0 0 1 20 0"></path><path d="M5 12a10 10 0 0 1 14 0"></path><path d="M8.5 15.5a5 5 0 0 1 7 0"></path><path d="M12 19h.01"></path></svg>
             <span id="network-status-label" class="sr-only"></span>
           </span>
-          <button id="device-settings" type="button" class="btn btn-default btn-sm" data-i18n-aria="ui.device_settings" data-i18n-title="ui.device_settings">
+          <button id="device-settings" type="button" class="btn btn-default p-3" data-i18n-aria="ui.device_settings" data-i18n-title="ui.device_settings">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2"></rect><path d="M10 5.5h4M11 18.5h2"></path></svg>
+          </button>
+          <button id="back-home" type="button" class="btn btn-default p-3 ml-2" data-i18n-aria="ui.home" data-i18n-title="ui.home" hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"></path></svg>
           </button>
         </div>
       </header>
@@ -78,10 +81,6 @@
 
       <section id="session-view" hidden>
         <div class="frappe-card p-3 mb-3">
-          <div class="d-flex flex-wrap justify-content-between align-items-center">
-            <h2 id="session-title" class="h5"></h2>
-            <button id="back-home" type="button" class="btn btn-default btn-sm" data-i18n="ui.home"></button>
-          </div>
           <div id="session-summary" class="row mx-n1 mb-3">
             <div class="col-4 px-1"><div class="alert alert-info text-center p-2 mb-0 h-100"><small class="d-block text-dark" data-i18n="ui.metric_scanned"></small><strong id="metric-scanned" class="d-block h5 mb-0"></strong></div></div>
             <div class="col-4 px-1"><div class="alert alert-success text-center p-2 mb-0 h-100"><small class="d-block text-dark" data-i18n="ui.metal_checked"></small><strong id="metric-metal" class="d-block h5 mb-0"></strong></div></div>
@@ -106,11 +105,11 @@
           </div>
         </section>
 
-        <div class="nav nav-tabs nav-fill mb-3" role="tablist" data-i18n-aria="ui.session_tabs">
-          <button id="tab-po" type="button" class="nav-link active small px-1" role="tab" data-session-tab="po" aria-controls="panel-po" aria-selected="true" tabindex="0"><span data-i18n="ui.po"></span> <span id="tab-po-count" class="badge badge-light">0</span></button>
-          <button id="tab-items" type="button" class="nav-link small px-1" role="tab" data-session-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1"><span data-i18n="ui.items"></span> <span id="tab-items-count" class="badge badge-light">0</span></button>
-          <button id="tab-boxes" type="button" class="nav-link small px-1" role="tab" data-session-tab="boxes" aria-controls="panel-boxes" aria-selected="false" tabindex="-1"><span data-i18n="ui.boxes"></span></button>
-          <button id="tab-sync" type="button" class="nav-link small px-1" role="tab" data-session-tab="sync" aria-controls="panel-sync" aria-selected="false" tabindex="-1"><span data-i18n="ui.tab_sync"></span> <span id="tab-sync-count" class="badge badge-light">0</span></button>
+        <div class="nav nav-tabs d-flex flex-nowrap justify-content-center mb-3" role="tablist" data-i18n-aria="ui.session_tabs">
+          <button id="tab-po" type="button" class="nav-link active small text-nowrap px-2" role="tab" data-session-tab="po" aria-controls="panel-po" aria-selected="true" tabindex="0"><span data-i18n="ui.po"></span> <span id="tab-po-count" class="badge badge-light">0</span></button>
+          <button id="tab-items" type="button" class="nav-link small text-nowrap px-2" role="tab" data-session-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1"><span data-i18n="ui.items"></span> <span id="tab-items-count" class="badge badge-light">0</span></button>
+          <button id="tab-boxes" type="button" class="nav-link small text-nowrap px-2" role="tab" data-session-tab="boxes" aria-controls="panel-boxes" aria-selected="false" tabindex="-1"><span data-i18n="ui.boxes"></span></button>
+          <button id="tab-sync" type="button" class="nav-link small text-nowrap px-2" role="tab" data-session-tab="sync" aria-controls="panel-sync" aria-selected="false" tabindex="-1"><span data-i18n="ui.tab_sync"></span> <span id="tab-sync-count" class="badge badge-light">0</span></button>
         </div>
         <section id="panel-po" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-po"><div id="po-list" class="table-responsive"></div></section>
         <section id="panel-items" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-items" hidden><div id="item-list"></div></section>

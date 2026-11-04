@@ -42,6 +42,8 @@ Bản `0.1.12` gộp tab **Mã hàng** theo booking, PO và mã hàng để hi�
 
 Bản `0.1.13` hiển thị mã hàng bằng `SampleCode` như RFID cũ, và đặt **Đã scan**, **Rà kim**, **Thùng hoàn thành/kế hoạch** trong ba thẻ đầu phiên. Tab PO cũng tính số thùng hoàn thành thay cho số item đã scan. Khi số thùng trong SOAP thấp hơn kế hoạch booking, mẫu chỉ có một mã hàng và cùng `QtyPerSet` sẽ hiển thị số item kế hoạch ước tính; cảnh báo và chi tiết vẫn phân biệt phần chưa có RFID. Patch `v0_1_13_sync_session_metrics` cập nhật Web Page đã lưu khi Pilot migrate.
 
+Bản `0.1.14` giữ bốn tab phiên trên cùng một hàng ở điện thoại, giảm khoảng cách ngang giữa các tab và bỏ Booking ID cùng nút Trang chủ khỏi phần đầu thẻ chỉ số. Nút Trang chủ dạng icon nằm trên header cạnh Wi-Fi và cài đặt thiết bị, chỉ hiện khi đang xem phiên. Patch `v0_1_14_sync_session_navigation` cập nhật Web Page đã lưu khi Pilot migrate.
+
 ## Luồng API
 
 Một endpoint Frappe: `/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=...`. GET: `device_check`, `active`, `history`, `session`, `preview_conflicts`. POST JSON: `start`, `preload`, `refresh_delta`, `rehydrate`, `complete`, `delete`. Mọi thao tác kiểm tra lại ID của Factory Device và dùng Company lấy từ thiết bị. Payload phản hồi nằm trong `message` chuẩn của Frappe, bên trong có `success`, `data`, `message` và `errorCode` khi lỗi.
