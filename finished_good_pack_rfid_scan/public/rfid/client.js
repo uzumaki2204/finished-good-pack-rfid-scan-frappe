@@ -68,11 +68,11 @@
     for (const id of ['device-view', 'home-view', 'session-view']) show(id, id === name);
     show('back-home', name === 'session-view');
   };
-  const table = (target, columns, rows, emptyKey = 'ui.empty_rows') => {
+  const table = (target, columns, rows, emptyKey = 'ui.empty_rows', tableClass = 'table table-bordered') => {
     const parent = $(target);
     parent.replaceChildren();
     if (!rows.length) { const p = document.createElement('p'); p.className = 'text-muted'; p.textContent = i18n.text(emptyKey); parent.append(p); return; }
-    const element = document.createElement('table'); element.className = 'table table-bordered';
+    const element = document.createElement('table'); element.className = tableClass;
     const head = document.createElement('thead'); const header = document.createElement('tr');
     for (const [label] of columns) { const th = document.createElement('th'); th.scope = 'col'; th.textContent = i18n.text(label); header.append(th); }
     head.append(header); element.append(head);
@@ -178,7 +178,7 @@
   const renderSelectedSessionTab = () => {
     const rows = state.sessionRows;
     if (!rows) return;
-    if (state.activeSessionTab === 'po') table('po-list', [['ui.po', row => row.label || i18n.text('ui.not_available')], ['ui.boxes', row => row.progress]], rows.po);
+    if (state.activeSessionTab === 'po') table('po-list', [['ui.po', row => row.label || i18n.text('ui.not_available')], ['ui.boxes', row => row.progress]], rows.po, 'ui.empty_rows', 'table table-borderless mb-0');
     else if (state.activeSessionTab === 'items') renderItemList(rows.items);
     else if (state.activeSessionTab === 'boxes') renderBoxList();
     else {
