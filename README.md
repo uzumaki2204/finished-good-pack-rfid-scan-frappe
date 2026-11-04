@@ -52,6 +52,8 @@ Bản `0.1.17` nhận máy quét RFID khi ô nhập chưa được focus, xử l
 
 Bản `0.1.18` bỏ tab và danh sách RFID Đồng bộ, dàn đều ba tab PO/Mã hàng/Thùng; các tùy chọn cập nhật booking, khôi phục kế hoạch và xóa phiên chuyển vào phần tùy chọn phiên. Khi hoàn tất, giao diện hiển thị số bản ghi đang xử lý, đã tải lên trên tổng số, hoặc trạng thái chưa xác nhận. Patch `v0_1_18_hide_sync_tab_and_show_upload_count` cập nhật Web Page đã lưu khi Pilot migrate; cache service worker tăng lên v13.
 
+Bản `0.1.19` báo trạng thái đang tải booking khi tạo phiên và chuyển sang màn hình quét ngay sau khi API tạo phiên thành công. Nếu IndexedDB không lưu được, phiên vẫn mở để hiện rõ lỗi bộ nhớ offline. Cache service worker tăng lên v14.
+
 ## Luồng API
 
 Một endpoint Frappe: `/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=...`. GET: `device_check`, `active`, `history`, `session`, `preview_conflicts`. POST JSON: `start`, `preload`, `refresh_delta`, `rehydrate`, `complete`, `delete`. Mọi thao tác kiểm tra lại ID của Factory Device và dùng Company lấy từ thiết bị. Payload phản hồi nằm trong `message` chuẩn của Frappe, bên trong có `success`, `data`, `message` và `errorCode` khi lỗi.

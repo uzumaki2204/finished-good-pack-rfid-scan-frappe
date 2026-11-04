@@ -18,9 +18,10 @@
   const formatCount = count => Number(count || 0).toLocaleString(i18n.language === 'vi' ? 'vi-VN' : 'en-US');
   const node = (tag, className = '', label = '') => { const element = document.createElement(tag); element.className = className; element.textContent = label; return element; };
   const value = id => $(id).value.trim();
-  const show = (id, visible) => { $(id).hidden = !visible; };
+  const show = (id, visible) => { const element = $(id); if (element) element.hidden = !visible; };
   const renderCompletionProgress = () => {
     const status = $('completion-upload-status');
+    if (!status) return;
     const progress = state.completionProgress;
     if (!progress) { status.hidden = true; status.textContent = ''; return; }
     const messages = { uploading: 'ui.uploading_records', complete: 'ui.uploaded_records', failed: 'ui.upload_failed' };
@@ -241,7 +242,12 @@
       $('box-search').value = '';
     }
     views('session-view');
-    const local = s.sessionStatus === 'Completed' ? [] : await scansForSession();
+    let local = [];
+    let storageReady = true;
+    if (s.sessionStatus !== 'Completed') {
+      try { local = await scansForSession(); }
+      catch { storageReady = false; }
+    }
     const scans = s.sessionStatus === 'Completed' ? (s.scannedItems || []) : local;
     const plannedItems = (s.preloadedBookings || []).flatMap(b => (b.items || []).map(item => ({ ...item, bookingId: b.bookingId })));
     const plannedById = new Map(plannedItems.map(item => [`${item.bookingId}|${item.finishedGoodPackDetailId}`, item]));
@@ -374,6 +380,7 @@
     $('tab-items-count').textContent = String(state.sessionRows.items.length);
     for (const filter of BOX_FILTERS) $('box-' + filter + '-count').textContent = String(state.sessionRows.boxes.filter(row => boxStatus(row) === filter).length);
     selectSessionTab(state.activeSessionTab);
+    return storageReady;
   };
   const resetSessionNavigation = () => {
     closeItemDetail();
@@ -456,13 +463,30 @@
   const start = async () => {
     const bookingIds = value('booking-ids').split(/[\n,;]+/).map(x => x.trim()).filter(Boolean);
     if (!bookingIds.length) return notice('error.bookings_required', 'danger');
+    const button = $('start-session');
+    if (button.disabled) return;
+    button.disabled = true;
+    button.textContent = i18n.text('ui.starting');
     try {
       const preview = await api('preview_conflicts', { bookingIds });
       const confirmConflicts = preview.sessions.length > 0;
       if (confirmConflicts && !window.confirm(i18n.text('ui.confirm_conflict'))) return;
       const result = await api('start', { bookingIds, confirmConflicts }, 'POST');
-      resetScannerBuffer(); resetSessionNavigation(); await saveSession(result.session); notice('success.session_started', 'success');
+      const session = result?.session;
+      if (!session?.sessionId) throw { code: 'error.unexpected' };
+      resetScannerBuffer(); resetSessionNavigation();
+      state.session = session;
+      views('session-view');
+      let cacheReady = true;
+      try {
+        await store.put('sessions', session);
+        await store.put('meta', session.sessionId, 'currentSession');
+      } catch { cacheReady = false; }
+      const sessionRendered = await renderSession();
+      if (cacheReady && sessionRendered) notice('success.session_started', 'success');
+      else notice('error.offline_storage', 'warning');
     } catch (error) { explain(error); }
+    finally { button.disabled = false; button.textContent = i18n.text('ui.start'); }
   };
   const addScan = async (rfid, sessionId, focusAfter = false) => {
     if (!state.session || state.session.sessionId !== sessionId || state.session.sessionStatus !== 'Active'
