@@ -201,6 +201,8 @@
     for (const button of document.querySelectorAll('[data-session-tab]')) {
       const active = button.dataset.sessionTab === name;
       button.classList.toggle('active', active);
+      button.classList.toggle('btn-primary', active);
+      button.classList.toggle('btn-default', !active);
       button.setAttribute('aria-selected', String(active));
       button.tabIndex = active ? 0 : -1;
       show(`panel-${button.dataset.sessionTab}`, active);

@@ -105,14 +105,16 @@
           </div>
         </section>
 
-        <div class="nav nav-tabs d-flex flex-nowrap justify-content-center mb-3" role="tablist" data-i18n-aria="ui.session_tabs">
-          <button id="tab-po" type="button" class="nav-link active small text-nowrap px-2" role="tab" data-session-tab="po" aria-controls="panel-po" aria-selected="true" tabindex="0"><span data-i18n="ui.po"></span> <span id="tab-po-count" class="badge badge-light">0</span></button>
-          <button id="tab-items" type="button" class="nav-link small text-nowrap px-2" role="tab" data-session-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1"><span data-i18n="ui.items"></span> <span id="tab-items-count" class="badge badge-light">0</span></button>
-          <button id="tab-boxes" type="button" class="nav-link small text-nowrap px-2" role="tab" data-session-tab="boxes" aria-controls="panel-boxes" aria-selected="false" tabindex="-1"><span data-i18n="ui.boxes"></span></button>
-          <button id="tab-sync" type="button" class="nav-link small text-nowrap px-2" role="tab" data-session-tab="sync" aria-controls="panel-sync" aria-selected="false" tabindex="-1"><span data-i18n="ui.tab_sync"></span> <span id="tab-sync-count" class="badge badge-light">0</span></button>
+        <div class="text-center mb-3">
+          <div class="btn-group btn-group-sm" role="tablist" data-i18n-aria="ui.session_tabs">
+            <button id="tab-po" type="button" class="btn btn-primary active small text-nowrap px-1 py-3 mr-1" role="tab" data-session-tab="po" aria-controls="panel-po" aria-selected="true" tabindex="0"><span data-i18n="ui.po"></span> <span id="tab-po-count" class="badge badge-light">0</span></button>
+            <button id="tab-items" type="button" class="btn btn-default small text-nowrap px-1 py-3 mr-1" role="tab" data-session-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1"><span data-i18n="ui.items"></span> <span id="tab-items-count" class="badge badge-light">0</span></button>
+            <button id="tab-boxes" type="button" class="btn btn-default small text-nowrap px-1 py-3 mr-1" role="tab" data-session-tab="boxes" aria-controls="panel-boxes" aria-selected="false" tabindex="-1"><span data-i18n="ui.boxes"></span></button>
+            <button id="tab-sync" type="button" class="btn btn-default small text-nowrap px-1 py-3" role="tab" data-session-tab="sync" aria-controls="panel-sync" aria-selected="false" tabindex="-1"><span data-i18n="ui.tab_sync"></span> <span id="tab-sync-count" class="badge badge-light">0</span></button>
+          </div>
         </div>
         <section id="panel-po" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-po"><div id="po-list" class="table-responsive"></div></section>
-        <section id="panel-items" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-items" hidden><div id="item-list"></div></section>
+        <section id="panel-items" class="mb-3" role="tabpanel" aria-labelledby="tab-items" hidden><div id="item-list"></div></section>
         <section id="panel-boxes" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-boxes" hidden>
           <div class="btn-group btn-group-sm d-flex mb-3" role="group" data-i18n-aria="ui.box_filters">
             <button type="button" class="btn btn-primary flex-fill" data-box-filter="not-scanned" aria-pressed="true"><span data-i18n="ui.box_not_scanned"></span> <span id="box-not-scanned-count" class="badge badge-light">0</span></button>

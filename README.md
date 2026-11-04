@@ -44,6 +44,8 @@ Bản `0.1.13` hiển thị mã hàng bằng `SampleCode` như RFID cũ, và đ�
 
 Bản `0.1.14` giữ bốn tab phiên trên cùng một hàng ở điện thoại, giảm khoảng cách ngang giữa các tab và bỏ Booking ID cùng nút Trang chủ khỏi phần đầu thẻ chỉ số. Nút Trang chủ dạng icon nằm trên header cạnh Wi-Fi và cài đặt thiết bị, chỉ hiện khi đang xem phiên. Patch `v0_1_14_sync_session_navigation` cập nhật Web Page đã lưu khi Pilot migrate.
 
+Bản `0.1.15` thay `nav-tabs` bằng nhóm nút chuẩn Desk vì CSS website của site thêm lề phải 32px vào từng tab, làm cắt tab đầu trên điện thoại. Nhóm mới nằm gọn một hàng, giữ điều hướng bàn phím và trạng thái ARIA. Tab Mã hàng bỏ khung ngoài, mỗi mã chỉ còn một viền bo. Patch `v0_1_15_sync_compact_tabs` cập nhật Web Page đã lưu khi Pilot migrate.
+
 ## Luồng API
 
 Một endpoint Frappe: `/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=...`. GET: `device_check`, `active`, `history`, `session`, `preview_conflicts`. POST JSON: `start`, `preload`, `refresh_delta`, `rehydrate`, `complete`, `delete`. Mọi thao tác kiểm tra lại ID của Factory Device và dùng Company lấy từ thiết bị. Payload phản hồi nằm trong `message` chuẩn của Frappe, bên trong có `success`, `data`, `message` và `errorCode` khi lỗi.
