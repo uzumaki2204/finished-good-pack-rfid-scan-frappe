@@ -82,7 +82,11 @@
             <h2 id="session-title" class="h5"></h2>
             <button id="back-home" type="button" class="btn btn-default btn-sm" data-i18n="ui.home"></button>
           </div>
-          <p id="session-summary" class="text-muted"></p>
+          <div id="session-summary" class="row mx-n1 mb-3">
+            <div class="col-4 px-1"><div class="alert alert-info text-center p-2 mb-0 h-100"><small class="d-block text-dark" data-i18n="ui.metric_scanned"></small><strong id="metric-scanned" class="d-block h5 mb-0"></strong></div></div>
+            <div class="col-4 px-1"><div class="alert alert-success text-center p-2 mb-0 h-100"><small class="d-block text-dark" data-i18n="ui.metal_checked"></small><strong id="metric-metal" class="d-block h5 mb-0"></strong></div></div>
+            <div class="col-4 px-1"><div class="alert alert-warning text-center p-2 mb-0 h-100"><small class="d-block text-dark" data-i18n="ui.boxes"></small><strong id="metric-boxes" class="d-block h5 mb-0"></strong></div></div>
+          </div>
           <div id="session-warnings" class="alert alert-warning" hidden></div>
           <div id="completed-details" class="row" hidden>
             <div class="col-12 col-sm-6 mb-2"><small class="text-muted d-block" data-i18n="ui.vehicle"></small><strong id="completed-vehicle" class="text-break"></strong></div>

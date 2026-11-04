@@ -93,6 +93,8 @@
     table('box-list', [['ui.boxes', row => row.label || i18n.text('ui.not_available')], ['ui.scanned', row => row.progress]], rows);
   };
   const itemProgress = row => `${formatCount(row.scanned)}/${formatCount(row.total)}`;
+  const bookingTargetBoxes = booking => Math.max(
+    Number(booking.plannedBoxCount || 0), Number(booking.headerPlannedCartonCount || 0), Number(booking.headerActualCartonCount || 0));
   const closeItemDetail = () => {
     const modal = $('item-detail-modal');
     if (modal.hidden) return;
@@ -111,6 +113,12 @@
     const totalBox = node('div', 'border rounded p-2 h-100');
     totalBox.append(node('small', 'text-muted d-block', i18n.text('ui.total_items')), node('strong', '', formatCount(row.total)));
     total.append(totalBox); summary.append(scanned, total); body.append(summary);
+    if (row.pendingBoxes) {
+      const key = row.pendingItems ? 'ui.item_pending_items' : 'ui.item_pending_boxes';
+      body.append(node('p', 'alert alert-warning', i18n.text(key, {
+        items: formatCount(row.pendingItems), boxes: formatCount(row.pendingBoxes),
+      })));
+    }
     for (const market of row.markets) {
       const section = node('section', 'border rounded p-2 mb-3');
       const heading = node('div', 'd-flex justify-content-between align-items-center mb-2');
@@ -169,8 +177,7 @@
   const renderSelectedSessionTab = () => {
     const rows = state.sessionRows;
     if (!rows) return;
-    const progressColumns = label => [[label, row => row.label || i18n.text('ui.not_available')], ['ui.scanned', row => row.progress]];
-    if (state.activeSessionTab === 'po') table('po-list', progressColumns('ui.po'), rows.po);
+    if (state.activeSessionTab === 'po') table('po-list', [['ui.po', row => row.label || i18n.text('ui.not_available')], ['ui.boxes', row => row.progress]], rows.po);
     else if (state.activeSessionTab === 'items') renderItemList(rows.items);
     else if (state.activeSessionTab === 'boxes') renderBoxList();
     else {
@@ -231,12 +238,10 @@
     const scans = s.sessionStatus === 'Completed' ? (s.scannedItems || []) : local;
     const plannedItems = (s.preloadedBookings || []).flatMap(b => (b.items || []).map(item => ({ ...item, bookingId: b.bookingId })));
     const plannedById = new Map(plannedItems.map(item => [`${item.bookingId}|${item.finishedGoodPackDetailId}`, item]));
-    const localBoxes = new Set(scans.map(scan => `${scan.bookingId}|${scan.orderNo}|${scan.doNo}|${scan.dispPackNum}`).filter(x => !x.endsWith('|'))).size;
     const metalCount = scans.filter(scan => {
       const item = plannedById.get(`${scan.bookingId}|${scan.finishedGoodPackDetailId}`);
       return ['Y', 'YES', 'TRUE', '1'].includes(normalized(item?.isMetalCheck || scan.isMetalCheck));
     }).length;
-    $('session-summary').textContent = `${i18n.text('ui.scan_count', { count: scans.length })} · ${i18n.text('ui.metal_checked')}: ${metalCount} · ${i18n.text('ui.box_progress', { scanned: localBoxes, planned: s.plannedBoxCount || 0 })}`;
     const editable = s.sessionStatus === 'Active';
     if (!editable) state.completing = false;
     lockCompletionNavigation(editable && state.completing);
@@ -255,26 +260,29 @@
     bookingSelect.replaceChildren(...(s.bookingIds || []).map(id => { const option = document.createElement('option'); option.value = id; option.textContent = id; return option; }));
     if ((s.bookingIds || []).includes(selectedBooking)) bookingSelect.value = selectedBooking;
     const scannedIds = new Set(scans.map(x => `${x.bookingId}|${x.finishedGoodPackDetailId}`));
-    const po = new Map(), items = new Map(), boxes = new Map();
+    const po = new Map(), items = new Map(), boxes = new Map(), poBoxKeys = new Map(), poPendingBoxes = new Map();
     for (const booking of s.preloadedBookings || []) {
       const bookingId = booking?.bookingId || '';
       for (const item of booking.items || []) {
         const found = scannedIds.has(`${bookingId}|${item.finishedGoodPackDetailId}`);
         const poKey = JSON.stringify([bookingId, item.orderNo || '']);
         const boxKey = JSON.stringify([bookingId, item.orderNo || '', item.doNo || '', item.dispPackNum || '']);
+        if (!poBoxKeys.has(poKey)) poBoxKeys.set(poKey, new Set());
+        poBoxKeys.get(poKey).add(boxKey);
         for (const [map, signature, label] of [[po, poKey, item.orderNo], [boxes, boxKey, item.dispPackNum]]) {
           const row = map.get(signature) || { label, total: 0, scanned: 0 };
           row.total += 1; row.scanned += Number(found); map.set(signature, row);
         }
-        const itemCode = item.itemCode || item.sampleCode || '';
+        const itemCode = item.sampleCode || item.itemCode || '';
         const itemKey = JSON.stringify([bookingId, item.orderNo || '', itemCode]);
         let row = items.get(itemKey);
         if (!row) {
           row = { label: itemCode, bookingId, orderNo: item.orderNo || '', total: 0, scanned: 0,
-            boxKeys: new Set(), variantKeys: new Set(), markets: new Map() };
+            boxKeys: new Set(), variantKeys: new Set(), markets: new Map(), qtyPerSetValues: new Set(), pendingBoxes: 0, pendingItems: 0 };
           items.set(itemKey, row);
         }
         row.total += 1; row.scanned += Number(found); row.boxKeys.add(boxKey);
+        if (Number(item.qtyPerSet || 0) > 0) row.qtyPerSetValues.add(Number(item.qtyPerSet));
         const marketKey = JSON.stringify([item.marketCode || '', item.marketName || '']);
         let market = row.markets.get(marketKey);
         if (!market) {
@@ -293,10 +301,55 @@
         variant.total += 1; variant.scanned += Number(found);
       }
     }
+    const mappedBoxCounts = new Map();
+    for (const signature of boxes.keys()) {
+      const [bookingId] = JSON.parse(signature);
+      mappedBoxCounts.set(bookingId, (mappedBoxCounts.get(bookingId) || 0) + 1);
+    }
+    let plannedBoxTotal = 0;
+    const addPendingBoxes = (row, count) => {
+      row.pendingBoxes += count;
+      if (row.qtyPerSetValues.size === 1) {
+        const qtyPerSet = row.qtyPerSetValues.values().next().value;
+        row.pendingItems += count * qtyPerSet;
+        row.total += count * qtyPerSet;
+      }
+    };
+    for (const booking of s.preloadedBookings || []) {
+      const bookingId = booking.bookingId || '';
+      const mappedCount = mappedBoxCounts.get(bookingId) || 0;
+      const target = Math.max(mappedCount, bookingTargetBoxes(booking));
+      plannedBoxTotal += target;
+      let remaining = target - mappedCount;
+      const bookingItems = [...items.values()].filter(row => row.bookingId === bookingId);
+      const bookingPoKeys = [...poBoxKeys.keys()].filter(signature => JSON.parse(signature)[0] === bookingId);
+      for (const group of booking.unmappedBoxGroups || []) {
+        if (!remaining) break;
+        const count = Math.min(remaining, Math.max(0, Number(group.unmappedBoxCount || 0)));
+        const matching = bookingItems.filter(row => normalized(row.orderNo) === normalized(group.orderNo)
+          && (!group.sampleCode || normalized(row.label) === normalized(group.sampleCode)));
+        if (count && matching.length === 1) addPendingBoxes(matching[0], count);
+        const poKey = bookingPoKeys.find(signature => normalized(JSON.parse(signature)[1]) === normalized(group.orderNo));
+        if (count && poKey) poPendingBoxes.set(poKey, (poPendingBoxes.get(poKey) || 0) + count);
+        remaining -= count;
+      }
+      if (remaining && bookingItems.length === 1) addPendingBoxes(bookingItems[0], remaining);
+      if (remaining && bookingPoKeys.length === 1) poPendingBoxes.set(bookingPoKeys[0], (poPendingBoxes.get(bookingPoKeys[0]) || 0) + remaining);
+    }
+    plannedBoxTotal = Math.max(plannedBoxTotal, Number(s.plannedBoxCount || 0));
+    const completedBoxCount = [...boxes.values()].filter(row => row.total > 0 && row.scanned >= row.total).length;
+    $('metric-scanned').textContent = formatCount(scans.length);
+    $('metric-metal').textContent = formatCount(metalCount);
+    $('metric-boxes').textContent = `${formatCount(completedBoxCount)}/${formatCount(plannedBoxTotal)}`;
     const progress = rows => [...rows.values()].map(row => ({ ...row, progress: `${row.scanned}/${row.total}` }));
+    const poRows = [...po.entries()].map(([signature, row]) => {
+      const boxKeys = poBoxKeys.get(signature) || new Set();
+      const completed = [...boxKeys].filter(key => boxes.get(key)?.scanned === boxes.get(key)?.total).length;
+      return { label: row.label, progress: `${completed}/${boxKeys.size + (poPendingBoxes.get(signature) || 0)}` };
+    });
     const itemRows = [...items.values()].map(row => ({
       label: row.label, bookingId: row.bookingId, orderNo: row.orderNo, total: row.total, scanned: row.scanned,
-      boxCount: row.boxKeys.size,
+      boxCount: row.boxKeys.size + row.pendingBoxes, pendingBoxes: row.pendingBoxes, pendingItems: row.pendingItems,
       completedBoxes: [...row.boxKeys].filter(key => boxes.get(key)?.scanned === boxes.get(key)?.total).length,
       variantCount: row.variantKeys.size,
       markets: [...row.markets.values()].map(market => ({
@@ -304,7 +357,7 @@
         variants: [...market.variants.values()],
       })),
     }));
-    state.sessionRows = { po: progress(po), items: itemRows, boxes: progress(boxes), scans, editable };
+    state.sessionRows = { po: poRows, items: itemRows, boxes: progress(boxes), scans, editable };
     $('tab-po-count').textContent = String(state.sessionRows.po.length);
     $('tab-items-count').textContent = String(state.sessionRows.items.length);
     $('tab-sync-count').textContent = String(scans.length);
