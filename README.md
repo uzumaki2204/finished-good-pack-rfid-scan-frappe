@@ -30,6 +30,8 @@ Khi API trả HTTP 500, nội dung response vẫn giữ thông báo chung; **Err
 
 Bản `0.1.7` đọc operation từ query string trực tiếp để tương thích với cách Frappe bind request POST JSON.
 
+Bản `0.1.8` loại ký tự không hợp lệ theo XML 1.0 trong phản hồi SOAP kiểu legacy và ghi tên operation cùng lỗi parser vào **Error Log** khi parse vẫn thất bại; nội dung SOAP không được ghi log.
+
 ## Luồng API
 
 Một endpoint Frappe: `/api/method/finished_good_pack_rfid_scan.api.dispatch?operation=...`. GET: `device_check`, `active`, `history`, `session`, `preview_conflicts`. POST JSON: `start`, `preload`, `refresh_delta`, `rehydrate`, `complete`, `delete`. Mọi thao tác kiểm tra lại ID của Factory Device và dùng Company lấy từ thiết bị. Payload phản hồi nằm trong `message` chuẩn của Frappe, bên trong có `success`, `data`, `message` và `errorCode` khi lỗi.

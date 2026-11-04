@@ -1,5 +1,6 @@
 """Read-only SOAP booking source used by the RFID tablet."""
 
+import re
 from collections import defaultdict
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse
@@ -17,6 +18,8 @@ CONTRACT = "http://tempuri.org/"
 INSTANCE = "http://www.w3.org/2001/XMLSchema-instance"
 ET.register_namespace("s", SOAP)
 ET.register_namespace("i", INSTANCE)
+_NUMERIC_CHARACTER_REFERENCE = re.compile(r"&#(?:(?P<decimal>\d+)|x(?P<hex>[0-9A-Fa-f]+));")
+_XML_DECLARATION = re.compile(r"^\s*<\?xml\s[^?]*\?>")
 
 
 def _tag(name):
@@ -74,6 +77,28 @@ def _yes(root, *names):
     return _value(root, *names).casefold() in ("true", "1", "yes")
 
 
+def _is_xml_scalar(value):
+    return (
+        value in (0x9, 0xA, 0xD)
+        or 0x20 <= value <= 0xD7FF
+        or 0xE000 <= value <= 0xFFFD
+        or 0x10000 <= value <= 0x10FFFF
+    )
+
+
+def _sanitize_xml(raw):
+    without_invalid_scalars = "".join(char for char in raw if _is_xml_scalar(ord(char)))
+
+    def remove_invalid_reference(match):
+        try:
+            scalar = int(match.group("hex"), 16) if match.group("hex") else int(match.group("decimal"))
+        except ValueError:
+            return match.group(0)
+        return match.group(0) if _is_xml_scalar(scalar) else ""
+
+    return _NUMERIC_CHARACTER_REFERENCE.sub(remove_invalid_reference, without_invalid_scalars)
+
+
 def _soap_call(account, operation, envelope):
     try:
         response = requests.post(
@@ -86,8 +111,16 @@ def _soap_call(account, operation, envelope):
     except requests.RequestException:
         raise RfidError("error.soap_connection", 502) from None
     try:
-        root = ET.fromstring(response.content)
-    except ET.ParseError:
+        xml_text = _sanitize_xml(response.text).lstrip("\ufeff")
+        xml_text = _XML_DECLARATION.sub("", xml_text, count=1)
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as error:
+        frappe.log_error(
+            title=message("diagnostic.soap_operation", operation=operation),
+            message=(f"{type(error).__name__}: {error}; "
+                     f"content_type={response.headers.get('Content-Type', '')}; "
+                     f"response_bytes={len(response.content)}"),
+        )
         raise RfidError("error.soap_response", 502) from None
     if _first(root, "Fault") is not None:
         raise RfidError("error.soap_result", 502)
