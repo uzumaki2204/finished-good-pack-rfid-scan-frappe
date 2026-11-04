@@ -54,7 +54,9 @@ Bản `0.1.18` bỏ tab và danh sách RFID Đồng bộ, dàn đều ba tab PO/
 
 Bản `0.1.19` báo trạng thái đang tải booking khi tạo phiên và chuyển sang màn hình quét ngay sau khi API tạo phiên thành công. Nếu IndexedDB không lưu được, phiên vẫn mở để hiện rõ lỗi bộ nhớ offline. Cache service worker tăng lên v14.
 
-Bản `0.1.20` đưa thông báo số RFID đã tải lên ra màn hình danh sách sau khi hoàn tất phiên, đồng thời bỏ phần Tùy chọn phiên trên trang quét. Patch `v0_1_20_show_upload_notice_on_home` cập nhật Web Page đã lưu khi Pilot migrate; cache service worker tăng lên v15.
+Bản `0.1.20` đưa thông báo số RFID đã tải lên ra màn hình danh sách sau khi hoàn tất phiên và bỏ phần Tùy chọn phiên khỏi trang quét.
+
+Bản `0.1.21` chạy lại cập nhật Web Page đã lưu để gỡ phần Tùy chọn phiên còn sót trên site đã cài bản trước. Patch `v0_1_21_hide_session_options` cập nhật nội dung trang khi Pilot migrate; cache service worker tăng lên v16.
 
 ## Luồng API
 
