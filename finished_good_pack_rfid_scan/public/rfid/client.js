@@ -4,13 +4,13 @@
   const store = window.RfidOffline;
   const $ = id => document.getElementById(id);
   const state = { device: null, session: null, renderedSessionId: null, stream: null, cameraTimer: null, returnView: null,
-    activeSessionTab: 'po', activeBoxFilter: 'not-scanned', boxSearch: '', sessionRows: null, completing: false, completionPending: false };
+    activeSessionTab: 'po', activeBoxFilter: 'not-scanned', boxSearch: '', sessionRows: null, completing: false, completionPending: false, completionProgress: null };
   const SCAN_COMMIT_DELAY_MS = 60;
   let scannerCommitTimer = null;
   let lastFocusedRfidKeyAt = 0;
   let focusedRfidKeyBurst = 0;
   let scanQueue = Promise.resolve();
-  const SESSION_TABS = ['po', 'items', 'boxes', 'sync'];
+  const SESSION_TABS = ['po', 'items', 'boxes'];
   const BOX_FILTERS = ['not-scanned', 'scanning', 'completed'];
   const COMPLETION_LOCKED_CONTROLS = ['back-home', 'device-settings', 'refresh-booking', 'rehydrate-plan', 'delete-session'];
   const normalized = value => String(value || '').trim().toUpperCase();
@@ -19,6 +19,18 @@
   const node = (tag, className = '', label = '') => { const element = document.createElement(tag); element.className = className; element.textContent = label; return element; };
   const value = id => $(id).value.trim();
   const show = (id, visible) => { $(id).hidden = !visible; };
+  const renderCompletionProgress = () => {
+    const status = $('completion-upload-status');
+    const progress = state.completionProgress;
+    if (!progress) { status.hidden = true; status.textContent = ''; return; }
+    const messages = { uploading: 'ui.uploading_records', complete: 'ui.uploaded_records', failed: 'ui.upload_failed' };
+    const styles = { uploading: 'info', complete: 'success', failed: 'danger' };
+    status.className = `alert alert-${styles[progress.phase]} mb-3`;
+    status.textContent = i18n.text(messages[progress.phase], {
+      uploaded: formatCount(progress.uploaded), total: formatCount(progress.total),
+    });
+    status.hidden = false;
+  };
   const lockCompletionNavigation = locked => { for (const id of COMPLETION_LOCKED_CONTROLS) $(id).disabled = locked; };
   const expandPageShell = () => $('rfid-app')?.closest('body > div')?.classList.add('w-100');
   const notice = (key, kind = 'info', values = {}) => {
@@ -187,24 +199,6 @@
     if (state.activeSessionTab === 'po') table('po-list', [['ui.po', row => row.label || i18n.text('ui.not_available')], ['ui.boxes', row => row.progress]], rows.po, 'ui.empty_rows', 'table table-borderless mb-0');
     else if (state.activeSessionTab === 'items') renderItemList(rows.items);
     else if (state.activeSessionTab === 'boxes') renderBoxList();
-    else {
-      $('sync-status').textContent = i18n.text(state.session?.sessionStatus === 'Completed' ? 'ui.sync_complete' : 'ui.sync_local', { count: rows.scans.length });
-      const columns = [['ui.scan_rfid', row => row.rfid], ['ui.po', row => row.orderNo], ['ui.boxes', row => row.dispPackNum]];
-      if (rows.editable) columns.push(['ui.delete', row => {
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-default btn-sm'; button.textContent = i18n.text('ui.remove_scan');
-        button.onclick = async () => {
-          try {
-            const storedRows = await store.all('scans');
-            const stored = storedRows.find(item => item.sessionId === state.session.sessionId
-              && item.payload?.finishedGoodPackDetailId === row.finishedGoodPackDetailId);
-            if (stored) await store.remove('scans', stored.key);
-            notice('success.scan_removed', 'success'); await renderSession();
-          } catch { notice('error.offline_storage', 'danger'); }
-        };
-        return button;
-      }]);
-      table('scan-list', columns, rows.scans, 'ui.empty_scans');
-    }
   };
   const selectSessionTab = (name, focus = false) => {
     if (!SESSION_TABS.includes(name)) return;
@@ -243,7 +237,7 @@
     closeItemDetail();
     if (state.renderedSessionId !== s.sessionId) {
       state.renderedSessionId = s.sessionId;
-      state.activeSessionTab = 'po'; state.activeBoxFilter = 'not-scanned'; state.boxSearch = ''; state.completing = false;
+      state.activeSessionTab = 'po'; state.activeBoxFilter = 'not-scanned'; state.boxSearch = ''; state.completing = false; state.completionProgress = null;
       $('box-search').value = '';
     }
     views('session-view');
@@ -261,7 +255,12 @@
     show('scan-dock', editable && !state.completing);
     show('scan-dock-spacer', editable && !state.completing);
     show('completion-form', editable && state.completing);
-    show('sync-actions', editable);
+    show('session-actions', editable);
+    if (s.sessionStatus === 'Completed') {
+      const total = Number(s.totalScannedCount ?? scans.length);
+      state.completionProgress = { phase: 'complete', uploaded: total, total };
+    }
+    renderCompletionProgress();
     show('completed-details', s.sessionStatus === 'Completed');
     $('completed-vehicle').textContent = s.vehiclePlateNumber || i18n.text('ui.not_available');
     $('completed-driver').textContent = s.driverFullName || i18n.text('ui.not_available');
@@ -373,7 +372,6 @@
     state.sessionRows = { po: poRows, items: itemRows, boxes: progress(boxes), scans, editable };
     $('tab-po-count').textContent = String(state.sessionRows.po.length);
     $('tab-items-count').textContent = String(state.sessionRows.items.length);
-    $('tab-sync-count').textContent = String(scans.length);
     for (const filter of BOX_FILTERS) $('box-' + filter + '-count').textContent = String(state.sessionRows.boxes.filter(row => boxStatus(row) === filter).length);
     selectSessionTab(state.activeSessionTab);
   };
@@ -614,6 +612,8 @@
       $('completion-driver').value = state.session.driverFullName || '';
       $('completion-note').value = state.session.note || '';
       state.completing = true;
+      state.completionProgress = null;
+      renderCompletionProgress();
       lockCompletionNavigation(true);
       show('completion-form', true); show('scan-dock', false); show('scan-dock-spacer', false);
       clearNotice(); $('completion-form').scrollIntoView({ block: 'start' });
@@ -623,6 +623,8 @@
   const cancelCompletion = () => {
     if (state.completionPending) return;
     state.completing = false;
+    state.completionProgress = null;
+    renderCompletionProgress();
     lockCompletionNavigation(false);
     show('completion-form', false); show('scan-dock', true); show('scan-dock-spacer', true);
     clearNotice(); $('rfid-input').focus();
@@ -639,16 +641,27 @@
     state.completionPending = true;
     const pendingControls = ['confirm-completion', 'cancel-completion'];
     for (const id of pendingControls) $(id).disabled = true;
+    let total = 0;
     try {
       const scans = await scansForSession();
+      total = scans.length;
+      state.completionProgress = { phase: 'uploading', uploaded: 0, total };
+      renderCompletionProgress();
       const session = await api('complete', { sessionId: state.session.sessionId, scans,
         vehiclePlateNumber, driverFullName, note: value('completion-note') }, 'POST');
+      const uploaded = Number(session.totalScannedCount ?? scans.length);
+      state.completionProgress = { phase: 'complete', uploaded, total: scans.length };
+      renderCompletionProgress();
       state.completing = false;
       lockCompletionNavigation(false);
       try { await store.clearScans(session.sessionId); await saveSession(session); }
       catch { state.session = session; await renderSession(); return notice('error.offline_storage', 'danger'); }
       notice('success.session_completed', 'success');
-    } catch (error) { explain(error); }
+    } catch (error) {
+      state.completionProgress = { phase: 'failed', uploaded: 0, total };
+      renderCompletionProgress();
+      explain(error);
+    }
     finally { state.completionPending = false; for (const id of pendingControls) $(id).disabled = false; }
   };
   const deleteSession = async sessionId => {

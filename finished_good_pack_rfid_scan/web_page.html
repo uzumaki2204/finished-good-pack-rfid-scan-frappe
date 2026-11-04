@@ -104,13 +104,13 @@
             <button id="confirm-completion" type="button" class="btn btn-primary flex-grow-1" data-i18n="ui.confirm_completion"></button>
           </div>
         </section>
+        <p id="completion-upload-status" class="alert alert-info mb-3" role="status" aria-live="polite" hidden></p>
 
         <div class="text-center mb-3">
           <div class="btn-group btn-group-sm d-flex" role="tablist" data-i18n-aria="ui.session_tabs">
-            <button id="tab-po" type="button" class="btn btn-primary active small text-nowrap px-1 py-3 mr-1" role="tab" data-session-tab="po" aria-controls="panel-po" aria-selected="true" tabindex="0"><span data-i18n="ui.po"></span> <span id="tab-po-count" class="badge badge-light">0</span></button>
-            <button id="tab-items" type="button" class="btn btn-default small text-nowrap px-1 py-3 mr-1" role="tab" data-session-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1"><span data-i18n="ui.items"></span> <span id="tab-items-count" class="badge badge-light">0</span></button>
-            <button id="tab-boxes" type="button" class="btn btn-default small text-nowrap px-1 py-3 mr-1" role="tab" data-session-tab="boxes" aria-controls="panel-boxes" aria-selected="false" tabindex="-1"><span data-i18n="ui.boxes"></span></button>
-            <button id="tab-sync" type="button" class="btn btn-default small text-nowrap px-1 py-3" role="tab" data-session-tab="sync" aria-controls="panel-sync" aria-selected="false" tabindex="-1"><span data-i18n="ui.tab_sync"></span> <span id="tab-sync-count" class="badge badge-light">0</span></button>
+            <button id="tab-po" type="button" class="btn btn-primary active small text-nowrap flex-fill px-1 py-3" role="tab" data-session-tab="po" aria-controls="panel-po" aria-selected="true" tabindex="0"><span data-i18n="ui.po"></span> <span id="tab-po-count" class="badge badge-light">0</span></button>
+            <button id="tab-items" type="button" class="btn btn-default small text-nowrap flex-fill px-1 py-3" role="tab" data-session-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1"><span data-i18n="ui.items"></span> <span id="tab-items-count" class="badge badge-light">0</span></button>
+            <button id="tab-boxes" type="button" class="btn btn-default small text-nowrap flex-fill px-1 py-3" role="tab" data-session-tab="boxes" aria-controls="panel-boxes" aria-selected="false" tabindex="-1"><span data-i18n="ui.boxes"></span></button>
           </div>
         </div>
         <section id="panel-po" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-po"><div id="po-list" class="table-responsive"></div></section>
@@ -124,10 +124,9 @@
           <div class="d-flex mb-3"><label for="box-search" class="sr-only" data-i18n="ui.box_search"></label><input id="box-search" type="search" class="form-control mr-2" data-i18n-placeholder="ui.box_search"><button id="clear-box-search" type="button" class="btn btn-default" data-i18n-aria="ui.clear_filter" data-i18n-title="ui.clear_filter"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"></path></svg></button></div>
           <div id="box-list" class="table-responsive"></div>
         </section>
-        <section id="panel-sync" class="frappe-card p-3 mb-3" role="tabpanel" aria-labelledby="tab-sync" hidden>
-          <p id="sync-status" class="text-muted" role="status" aria-live="polite"></p>
-          <div id="scan-list" class="table-responsive"></div>
-          <div id="sync-actions" class="mt-3" hidden>
+        <details id="session-actions" class="frappe-card p-3 mb-3" hidden>
+          <summary data-i18n="ui.session_actions"></summary>
+          <div class="mt-3">
             <div class="form-group"><label for="booking-select" data-i18n="ui.booking_ids"></label><select id="booking-select" class="form-control"></select></div>
             <div class="d-flex flex-wrap">
               <button id="refresh-booking" type="button" class="btn btn-default mr-2 mb-2" data-i18n="ui.refresh_booking"></button>
@@ -135,7 +134,7 @@
               <button id="delete-session" type="button" class="btn btn-danger mb-2" data-i18n="ui.delete"></button>
             </div>
           </div>
-        </section>
+        </details>
         <div id="scan-dock-spacer" class="py-5 mb-5" aria-hidden="true" hidden></div>
         <div id="scan-dock" class="fixed-bottom bg-white border-top shadow-sm py-2" hidden>
           <div class="container-fluid"><div class="row justify-content-center"><div class="col-12 col-sm-11 col-md-10 col-lg-8 col-xl-7">
