@@ -114,8 +114,22 @@ def summaries(rows):
 @frappe.whitelist(methods=["GET"])
 def options():
     authorize()
-    return {"companies": frappe.get_all("Company", fields=["name", "company_name"], order_by="name"),
-            "devices": frappe.get_all("Factory Device", fields=["name", "device_name", "company"], order_by="device_name")}
+    sessions = frappe.db.sql("""SELECT DISTINCT company, device, status
+        FROM `tabRFID Scan Session` WHERE status IN ('Active', 'Completed')""", as_dict=True)
+    company_ids = sorted({row.company for row in sessions if row.company})
+    device_ids = sorted({row.device for row in sessions if row.device})
+    snapshots = frappe.db.sql("""SELECT DISTINCT b.booking_id, JSON_EXTRACT(b.payload, '$.orderNos') AS orders
+        FROM `tabRFID Booking Snapshot` b INNER JOIN `tabRFID Scan Session` s ON s.name=b.session
+        WHERE s.status IN ('Active', 'Completed')""", as_dict=True)
+    return {
+        "companies": frappe.get_all("Company", filters={"name": ["in", company_ids]},
+            fields=["name", "company_name"], order_by="company_name") if company_ids else [],
+        "devices": frappe.get_all("Factory Device", filters={"name": ["in", device_ids]},
+            fields=["name", "device_name", "company"], order_by="device_name") if device_ids else [],
+        "statuses": sorted({row.status for row in sessions}),
+        "bookings": sorted({row.booking_id for row in snapshots if row.booking_id}),
+        "orders": sorted({po for row in snapshots for po in decode(row.orders, []) if po}),
+    }
 
 
 @frappe.whitelist(methods=["GET"])

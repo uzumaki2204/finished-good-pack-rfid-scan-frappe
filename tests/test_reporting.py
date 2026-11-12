@@ -53,6 +53,27 @@ class ReportingTests(unittest.TestCase):
             with self.assertRaises(PermissionError): method(*args)
         self.db.sql.assert_not_called()
 
+    def test_options_only_include_existing_session_data_without_date_filter(self):
+        self.db.sql.side_effect = [
+            [types.SimpleNamespace(company="C1", device="D1", status="Completed")],
+            [types.SimpleNamespace(booking_id="B1", orders='["PO1", "PO1"]')],
+        ]
+        result = report.options()
+        self.assertEqual(result["bookings"], ["B1"])
+        self.assertEqual(result["orders"], ["PO1"])
+        self.assertEqual(result["statuses"], ["Completed"])
+        calls = frappe.get_all.call_args_list
+        self.assertEqual(calls[0].kwargs["filters"], {"name": ["in", ["C1"]]})
+        self.assertEqual(calls[1].kwargs["filters"], {"name": ["in", ["D1"]]})
+        for call in self.db.sql.call_args_list:
+            self.assertIn("IN ('Active', 'Completed')", call.args[0])
+            self.assertNotIn("session_started_at", call.args[0])
+
+    def test_empty_options_do_not_list_all_master_records(self):
+        self.db.sql.return_value = []
+        self.assertEqual(report.options(), dict(companies=[], devices=[], statuses=[], bookings=[], orders=[]))
+        frappe.get_all.assert_not_called()
+
     def test_date_bounds_vietnam_and_invalid(self):
         self.assertEqual(report.date_bounds("2026-11-01", "2026-11-12"),
                          (datetime(2026, 10, 31, 17), datetime(2026, 11, 12, 17)))

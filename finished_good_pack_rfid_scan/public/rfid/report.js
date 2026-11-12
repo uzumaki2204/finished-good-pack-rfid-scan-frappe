@@ -86,10 +86,10 @@
     };
     input('from_date','Từ ngày','date',now.slice(0,8)+'01'); input('to_date','Đến ngày','date',now);
     input('company','Công ty','select'); input('device','Thiết bị','select'); input('status','Trạng thái','select');
-    input('booking','Booking'); input('po','PO');
+    input('booking','Booking','select'); input('po','PO','select');
     const option = (select,label,value='') => {const el = node('option',label);el.value = value;select.append(el);};
     option(fields.company,'Tất cả công ty'); option(fields.device,'Tất cả thiết bị');
-    option(fields.status,'Tất cả trạng thái'); option(fields.status,'Đang scan','Active'); option(fields.status,'Đã hoàn thành','Completed');
+    option(fields.status,'Tất cả trạng thái'); option(fields.booking,'Tất cả Booking'); option(fields.po,'Tất cả PO');
     const load = refreshButton(() => overview(1));
     const print = printButton(() => {}); print.disabled = true;
     const filterActions = node('div', undefined, 'rfid-report-filter-actions');
@@ -158,6 +158,9 @@
     };
     call('options').then(data=>{
       data.companies.forEach(c=>option(fields.company,c.company_name||c.name,c.name));devices=data.devices;fields.company.onchange();
+      data.statuses.forEach(s=>option(fields.status,s==='Completed'?'Đã hoàn thành':'Đang scan',s));
+      data.bookings.forEach(b=>option(fields.booking,b,b));
+      data.orders.forEach(po=>option(fields.po,po,po));
     }).catch(()=>{info.hidden = selected !== null; info.textContent='Không tải được bộ lọc công ty/thiết bị. Hãy tải lại trang và kiểm tra quyền báo cáo.';});
     overview();
   }
