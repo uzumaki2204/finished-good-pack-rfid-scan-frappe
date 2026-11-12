@@ -14,6 +14,7 @@ if not hasattr(frappe, "whitelist"):
     frappe.whitelist = lambda **kwargs: lambda fn: fn
 
 from finished_good_pack_rfid_scan import reporting as report
+from finished_good_pack_rfid_scan.report_print import render
 
 
 def record(**changes):
@@ -47,7 +48,7 @@ class ReportingTests(unittest.TestCase):
 
     def test_every_endpoint_checks_authority(self):
         frappe.session.user = "Guest"
-        for method, args in [(report.options, ()), (report.overview, ()), (report.detail, ("S",)),
+        for method, args in [(report.print_report, ()), (report.options, ()), (report.overview, ()), (report.detail, ("S",)),
                              (report.photo_list, ("S",)), (report.photo_content, ("S", "P"))]:
             with self.assertRaises(PermissionError): method(*args)
         self.db.sql.assert_not_called()
@@ -124,6 +125,53 @@ class ReportingTests(unittest.TestCase):
         for file in [types.SimpleNamespace(is_private=0),types.SimpleNamespace(is_private=1,attached_to_doctype="Other")]:
             frappe.get_doc.side_effect=[record(),photo,file]
             with self.assertRaises(LookupError): report.photo_content("S1","P")
+
+    def test_print_html_escapes_data_and_matches_excel_columns(self):
+        html = render([{"po":"<script>alert(1)</script>","rfid":"RFID-LAST","box":"00001"}],
+                      session={"bookingIds":["B1"],"status":"Active","driver":"<img src=x>","plannedItems":0,"plannedBoxes":0})
+        self.assertNotIn("<script>alert", html)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;",html)
+        self.assertIn("&lt;img src=x&gt;",html)
+        self.assertIn("BÁO CÁO CHI TIẾT SCAN RFID LOAD CONT",html)
+        self.assertIn("Chưa đồng bộ dữ liệu scan",html)
+        self.assertIn("00001",html)
+        self.assertEqual(html.count('scope="col"'),14)
+        self.assertIn("RFID-LAST",html)
+        html = render([],filters={"from_date":"01/11/2026","company":"C"})
+        self.assertIn("BÁO CÁO TỔNG QUAN SCAN RFID LOAD CONT",html)
+        self.assertIn("Không có dữ liệu",html)
+        self.assertEqual(html.count('scope="col"'),14)
+
+    def test_print_has_extra_booking_column_only_for_multi_booking(self):
+        html=render([],session={"bookingIds":["B1","B2"]})
+        self.assertEqual(html.count('scope="col"'),15)
+
+    def test_print_all_detail_batches_and_deny_deleted(self):
+        response_module=types.ModuleType("werkzeug.wrappers")
+        response_module.Response=lambda content,**kwargs: {"content":content,**kwargs}
+        frappe.get_doc.return_value=record()
+        with patch.dict(sys.modules,{"werkzeug.wrappers":response_module}), \
+             patch.object(report,"summaries",return_value=[{"bookingIds":["B1"],"status":"Completed"}]), \
+             patch.object(report,"scan_items",side_effect=[[{"rfid":str(i)} for i in range(500)],[{"rfid":"LAST-501"}]]) as scans:
+            result=report.print_report(session_id="S1")
+            self.assertIn("LAST-501",result["content"])
+            self.assertIn("501 dòng",result["content"])
+            self.assertEqual(scans.call_args.args,("S1",500,500))
+            self.assertEqual(result["headers"]["Cache-Control"],"private, no-store")
+            frappe.get_doc.return_value=record(status="Deleted")
+            with self.assertRaises(LookupError):report.print_report(session_id="S1")
+
+    def test_print_overview_not_limited_to_first_page(self):
+        response_module=types.ModuleType("werkzeug.wrappers")
+        response_module.Response=lambda content,**kwargs: content
+        self.db.sql.return_value=[record(name=f"S{i}") for i in range(55)]
+        def summaries(rows):return [{"company":r.name} for r in rows]
+        with patch.dict(sys.modules,{"werkzeug.wrappers":response_module}), patch.object(report,"summaries",side_effect=summaries):
+            html=report.print_report(from_date="2026-11-01",to_date="2026-11-12",booking="B1")
+        self.assertIn("55 dòng",html)
+        self.assertIn("S54",html)
+        self.assertNotIn("LIMIT",self.db.sql.call_args.args[0])
+        self.assertEqual(self.db.sql.call_args.args[1]["booking"],"B1")
 
 
 if __name__ == "__main__":

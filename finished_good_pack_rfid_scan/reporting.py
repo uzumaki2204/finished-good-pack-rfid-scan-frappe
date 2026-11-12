@@ -135,21 +135,25 @@ def detail(session_id, page=1):
     record = session_record(session_id)
     page = page_number(page)
     filters = {"session": record.name}
-    rows = frappe.get_all(service.SCAN, filters=filters,
+    return {"session": summaries([record])[0], "items": scan_items(record.name, (page - 1) * 100, 100),
+            "total": frappe.db.count(service.SCAN, filters), "page": page, "pageSize": 100}
+
+
+def scan_items(session_id, offset=0, limit=100):
+    """Use the same frozen scan mapping for Desk pages and full printed reports."""
+    rows = frappe.get_all(service.SCAN, filters={"session": session_id},
                           fields=["booking_id", "order_no", "do_no", "item_code", "disp_pack_num", "rfid", "is_metal_check", "scanned_at", "payload"],
-                          order_by="scanned_at asc, name asc", limit_start=(page - 1) * 100, limit_page_length=100)
+                          order_by="scanned_at asc, name asc", limit_start=offset, limit_page_length=limit)
     items = []
     for row in rows:
         payload = decode(row.payload, {})
-        # Payload is the validated, frozen plan item captured at completion.
         items.append({"booking": row.booking_id, "po": row.order_no, "do": row.do_no,
             "item": row.item_code, "marketCode": payload.get("marketCode"), "marketName": payload.get("marketName"),
             "colorCode": payload.get("colorCode"), "colorName": payload.get("colorName"),
             "sizeCode": payload.get("sizeCode"), "sizeName": payload.get("sizeName"),
             "metal": "Y" if row.is_metal_check else "N", "box": row.disp_pack_num,
             "boxCode": payload.get("usedPackNum"), "rfid": row.rfid, "scannedAt": service._iso(row.scanned_at)})
-    return {"session": summaries([record])[0], "items": items,
-            "total": frappe.db.count(service.SCAN, filters), "page": page, "pageSize": 100}
+    return items
 
 
 @frappe.whitelist(methods=["GET"])
@@ -179,3 +183,45 @@ def photo_content(session_id, photo_id, thumbnail=None):
     return Response(file.get_content(), mimetype="image/webp", headers={
         "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
         "Content-Disposition": 'inline; filename="rfid-photo.webp"'})
+
+
+@frappe.whitelist(methods=["GET"])
+def print_report(session_id=None, from_date=None, to_date=None, company=None, device=None,
+                 status=None, booking=None, po=None):
+    """Authenticated print preview containing every matching row, never just the current page."""
+    authorize()
+    from finished_good_pack_rfid_scan.report_print import render
+    from werkzeug.wrappers import Response
+
+    filters = dict(from_date=from_date, to_date=to_date, company=company, device=device,
+                   status=status, booking=booking, po=po)
+    if session_id:
+        record = session_record(session_id)
+        summary = summaries([record])[0]
+        rows = []
+        offset = 0
+        while True:
+            batch = scan_items(record.name, offset, 500)
+            rows.extend(batch)
+            if len(batch) < 500:
+                break
+            offset += 500
+        html = render(rows, session=summary)
+    else:
+        where, args = where_clause(filters)
+        records = frappe.db.sql(f"SELECT s.* FROM `tabRFID Scan Session` s WHERE {where} ORDER BY s.session_started_at DESC, s.name DESC", args, as_dict=True)
+        rows = []
+        for offset in range(0, len(records), 50):
+            rows.extend(summaries(records[offset:offset + 50]))
+        start, end = date_bounds(from_date, to_date)
+        filters["from_date"] = (start.replace(tzinfo=timezone.utc).astimezone(VN)).strftime("%d/%m/%Y")
+        filters["to_date"] = ((end.replace(tzinfo=timezone.utc).astimezone(VN)) - timedelta(days=1)).strftime("%d/%m/%Y")
+        if company:
+            filters["company"] = frappe.db.get_value("Company", company, "company_name") or company
+        if device:
+            filters["device"] = frappe.db.get_value("Factory Device", device, "device_name") or device
+        html = render(rows, filters=filters)
+    return Response(html, mimetype="text/html", headers={
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'self'",
+        "Referrer-Policy": "same-origin"})

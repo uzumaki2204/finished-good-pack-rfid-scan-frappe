@@ -103,7 +103,7 @@ Cập nhật bằng Pilot, migrate để tạo DocType và áp dụng patch `v0_
 
 Mở `/app/rfid-load-cont-report` trong Frappe Desk (hoặc tìm “Báo cáo RFID Load Cont”).
 Role `RFID Report Manager` và `System Manager` được xem mọi công ty; migration không gán thêm role cho người dùng.
-Báo cáo chỉ đọc, không xuất Excel/PDF, không sửa scan hoặc ảnh.
+Báo cáo chỉ đọc, không sửa scan hoặc ảnh.
 
 - Tổng quan: 50 phiên/trang, lọc theo ngày bắt đầu (giờ Việt Nam), công ty, thiết bị, trạng thái, Booking và PO chính xác. Mặc định từ đầu tháng đến hôm nay.
 - Mỗi dòng là một phiên. Không cộng kế hoạch của nhiều phiên cùng Booking.
@@ -120,3 +120,11 @@ Ngày lọc chuyển từ UTC+7 sang UTC lưu trong session; cận cuối là ng
 Danh sách trả items/total/page/pageSize; ảnh dùng nextCursor, nội dung WebP có no-store.
 
 Pilot cập nhật rồi migrate để đồng bộ Page, role và index ngày. Tài khoản quản lý báo cáo chuyên biệt cần được quản trị viên gán role thủ công.
+
+
+### In báo cáo theo mẫu Excel (0.1.27)
+
+Nút **In** ở tổng quan mở bản in cho toàn bộ kết quả của bộ lọc đã áp dụng; nút **In** trong chi tiết mở toàn bộ RFID của phiên, kể cả các trang chưa xem.
+Bản xem trước có nút **In / Lưu PDF** dùng hộp thoại in của trình duyệt. Bố cục A4 ngang, tiêu đề, thông tin đầu trang và thứ tự cột theo hai sheet Excel mẫu; lặp tiêu đề bảng khi sang trang, không in menu/nút/ảnh.
+Phiên nhiều Booking có thêm cột Booking trong bảng chi tiết để phân biệt. Phiên Active vẫn ghi rõ chưa đồng bộ.
+API GET `finished_good_pack_rfid_scan.reporting.print_report` nhận `session_id` hoặc bộ lọc của overview (không nhận page), trả HTML riêng tư no-store, kiểm tra cùng role quản lý và chặn phiên Deleted.

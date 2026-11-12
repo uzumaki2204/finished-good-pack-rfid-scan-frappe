@@ -79,6 +79,9 @@
     const info = node('p','Lọc theo ngày bắt đầu phiên (giờ Việt Nam). Mỗi dòng là một phiên. Booking và PO tìm theo mã chính xác.','text-muted');
     const content = node('section'); root.append(filters,info,content);
     let request = 0, selected = null, overviewPage = 1, devices = [];
+    function printReport(args) {
+      window.open('/api/method/' + API + 'print_report?' + new URLSearchParams(args), '_blank', 'noopener');
+    }
     function error(target, action) {target.replaceChildren(node('p','Không thể tải dữ liệu. Vui lòng kiểm tra quyền truy cập hoặc thử lại.','text-danger'),button('Thử lại',action));}
     async function overview(pageIndex=1) {
       const seq = ++request; selected = null; overviewPage = pageIndex;
@@ -87,7 +90,9 @@
       if (!args.from_date || !args.to_date || args.from_date > args.to_date) {content.replaceChildren(node('p','Vui lòng chọn khoảng ngày hợp lệ.','text-danger'));return;}
       try {
         const data = await call('overview', {...args,page:pageIndex}); if(seq !== request) return;
-        content.replaceChildren(table(overviewColumns,data.items,open),pager(data,overview));
+        const actions = node('div', undefined, 'rfid-report-actions');
+        actions.append(button('In', () => printReport(args)));
+        content.replaceChildren(actions,table(overviewColumns,data.items,open),pager(data,overview));
       } catch {if(seq === request) error(content,()=>overview(pageIndex));}
     }
     async function open(id,pageIndex=1) {
@@ -95,7 +100,7 @@
       content.replaceChildren(node('p','Đang tải chi tiết…'));
       try {
         const data = await call('detail',{session_id:id,page:pageIndex}); if(seq !== request) return;
-        const header = node('div',undefined,'rfid-report-actions'); header.append(button('← Tổng quan',()=>overview(overviewPage)),button('Làm mới',()=>open(id,pageIndex)));
+        const header = node('div',undefined,'rfid-report-actions'); header.append(button('← Tổng quan',()=>overview(overviewPage)),button('Làm mới',()=>open(id,pageIndex)),button('In',()=>printReport({session_id:id})));
         const title = node('h3',`Chi tiết phiên · ${data.session.bookingIds.join(', ')}`);
         const summary = node('dl',undefined,'rfid-report-summary');
         overviewColumns.forEach(([key,label,format])=>{summary.append(node('dt',label),node('dd',text(format?format(data.session[key]):data.session[key])));});
