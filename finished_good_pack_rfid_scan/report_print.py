@@ -75,13 +75,12 @@ def render(rows, session=None, filters=None):
             body.append('<p class="pending">'+PENDING+'. Các lượt quét được gửi lên máy chủ khi hoàn thành phiên.</p>')
     else:
         filters = filters or {}
-        body.append('<div class="filter-summary">')
-        for label,key,default in [("Từ ngày","from_date",""),("Đến ngày","to_date",""),("Công ty","company","Tất cả công ty"),
-                                  ("Thiết bị","device",""),("Trạng thái","status",""),("Booking","booking",""),("PO","po","")]:
+        body.append('<h1>'+title+'</h1><div class="filter-summary">')
+        for label,key,default in [("Thiết bị","device",""),("Trạng thái","status",""),("Booking","booking",""),("PO","po","")]:
             raw = filters.get(key) or default
             if raw:
                 body.append('<div><b>'+label+':</b> '+value(status(raw) if key == "status" else raw)+'</div>')
-        body.append('</div><h1>'+title+'</h1>')
+        body.append('</div>')
     widths = sum(c[2] for c in columns)
     body.append('<table class="data"><colgroup>'+''.join(f'<col width="{width / widths * 100:.3f}%">' for _,_,width in columns)+'</colgroup><thead><tr>')
     body.append(''.join('<th scope="col">'+label+'</th>' for _,label,_ in columns)+'</tr></thead><tbody>')
