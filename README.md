@@ -97,3 +97,26 @@ API mới:
 Upload và API JSON giữ envelope `message: {success, data, errorCode?, message}`. Không trả URL file nội bộ. Khi dùng phiên đăng nhập Frappe, POST gửi CSRF token. Proxy phải cho phép multipart trên 20 MiB cộng phần header; không tăng quyền hay bỏ kiểm tra thiết bị.
 
 Cập nhật bằng Pilot, migrate để tạo DocType và áp dụng patch `v0_1_25_session_photos`. Service worker v20 nạp module ảnh mới. Dependency Pillow >=12,<14 được cài cùng app. Kiểm thử: `python -m unittest discover -s tests -v` và `node --check finished_good_pack_rfid_scan/public/rfid/photos.js`.
+
+
+## Báo cáo quản lý RFID Load Cont (0.1.26)
+
+Mở `/app/rfid-load-cont-report` trong Frappe Desk (hoặc tìm “Báo cáo RFID Load Cont”).
+Role `RFID Report Manager` và `System Manager` được xem mọi công ty; migration không gán thêm role cho người dùng.
+Báo cáo chỉ đọc, không xuất Excel/PDF, không sửa scan hoặc ảnh.
+
+- Tổng quan: 50 phiên/trang, lọc theo ngày bắt đầu (giờ Việt Nam), công ty, thiết bị, trạng thái, Booking và PO chính xác. Mặc định từ đầu tháng đến hôm nay.
+- Mỗi dòng là một phiên. Không cộng kế hoạch của nhiều phiên cùng Booking.
+- Chi tiết: 100 RFID/trang, dữ liệu snapshot tại thời điểm hoàn thành; `usedPackNum` là code thùng. Trường thiếu để “—”.
+- Active chưa gửi scan lên server: chỉ tiêu scan hiển thị “Chưa đồng bộ dữ liệu scan”. Kế hoạch và ảnh đã tải vẫn xem được.
+- Ảnh chỉ xem, 24 ảnh/trang; ảnh riêng tư đi qua API xác thực, không trả URL File.
+- Phiên Deleted không được truy cập; API tablet và quyền theo thiết bị giữ nguyên.
+
+API GET (Frappe `message` wrapper), tất cả yêu cầu đăng nhập + role:
+`finished_good_pack_rfid_scan.reporting.options`, `.overview`, `.detail`, `.photo_list`, `.photo_content`.
+`overview`: from_date/to_date (YYYY-MM-DD), company/device (ID), status, booking, po, page.
+`detail`: session_id, page. `photo_list`: session_id, before. `photo_content`: session_id, photo_id, thumbnail=1.
+Ngày lọc chuyển từ UTC+7 sang UTC lưu trong session; cận cuối là ngày kế tiếp không bao gồm.
+Danh sách trả items/total/page/pageSize; ảnh dùng nextCursor, nội dung WebP có no-store.
+
+Pilot cập nhật rồi migrate để đồng bộ Page, role và index ngày. Tài khoản quản lý báo cáo chuyên biệt cần được quản trị viên gán role thủ công.

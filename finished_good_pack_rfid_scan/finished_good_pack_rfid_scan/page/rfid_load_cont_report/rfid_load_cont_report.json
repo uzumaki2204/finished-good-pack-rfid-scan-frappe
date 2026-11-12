@@ -1,0 +1,17 @@
+{
+  "doctype": "Page",
+  "name": "rfid-load-cont-report",
+  "page_name": "rfid-load-cont-report",
+  "title": "Báo cáo RFID Load Cont",
+  "module": "Finished Good Pack RFID Scan",
+  "standard": "Yes",
+  "system_page": 0,
+  "roles": [
+    {
+      "role": "RFID Report Manager"
+    },
+    {
+      "role": "System Manager"
+    }
+  ]
+}

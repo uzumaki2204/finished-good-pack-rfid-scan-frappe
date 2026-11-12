@@ -15,6 +15,12 @@ add_to_apps_screen = [{
     "title": app_title,
     "route": "/finished-good-pack-rfid-scan",
     "has_permission": "finished_good_pack_rfid_scan.access.can_open",
+}, {
+    "name": "rfid_load_cont_report",
+    "logo": "/assets/finished_good_pack_rfid_scan/rfid/icon.svg",
+    "title": "Báo cáo RFID Load Cont",
+    "route": "/app/rfid-load-cont-report",
+    "has_permission": "finished_good_pack_rfid_scan.reporting.can_open",
 }]
 
 before_install = "finished_good_pack_rfid_scan.install.before_install"

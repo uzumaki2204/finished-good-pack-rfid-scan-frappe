@@ -1,0 +1,24 @@
+.rfid-report {padding:20px; color:var(--text-color,#243449)}
+.rfid-report-filters {display:grid; grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px;align-items:end;margin-bottom:16px}
+.rfid-report-filters label {display:flex;flex-direction:column;gap:6px;margin:0;font-weight:500}
+.rfid-report-filters button {min-height:36px}
+.rfid-report-table {overflow:auto;max-height:65vh;border:1px solid var(--border-color,#dce3e9);border-radius:8px}
+.rfid-report-table table {margin:0;width:max-content;min-width:100%;font-size:13px}
+.rfid-report-table thead {position:sticky;top:0;z-index:1;background:var(--fg-color,#fff)}
+.rfid-report-table th {white-space:nowrap;background:var(--fg-color,#fff);box-shadow:0 1px var(--border-color,#ddd)}
+.rfid-report-table td {max-width:300px;min-width:90px;white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
+.rfid-report-table tbody tr:nth-child(even) {background:var(--subtle-fg,#f6f8fa)}
+.rfid-report-pager,.rfid-report-actions {display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0}
+.rfid-report-pager span {margin-right:auto}
+.rfid-report-summary {display:grid;grid-template-columns:130px minmax(0,1fr) 130px minmax(0,1fr);gap:8px 16px;background:var(--subtle-fg,#f6f8fa);padding:18px;border-radius:8px}
+.rfid-report-summary dt {font-weight:500;color:var(--text-muted,#607080)}
+.rfid-report-summary dd {margin:0;overflow-wrap:anywhere}
+.rfid-report-photos {margin-top:24px}
+.rfid-report-gallery {display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:16px 0}
+.rfid-report-photo {display:flex;flex-direction:column;gap:8px;border:1px solid var(--border-color,#ddd);background:var(--fg-color,#fff);border-radius:8px;padding:8px;color:inherit;text-align:left;cursor:pointer;min-width:0}
+.rfid-report-photo img {width:100%;height:140px;object-fit:contain}
+.rfid-report-photo span {overflow-wrap:anywhere;font-size:12px}
+.rfid-report-viewer {border:0;border-radius:12px;background:var(--fg-color,#fff);color:var(--text-color,#222);width:min(95vw,1200px);max-height:95vh;padding:16px}
+.rfid-report-viewer::backdrop {background:#000a}
+.rfid-report-viewer img {display:block;max-width:100%;max-height:80vh;margin:12px auto 0;object-fit:contain}
+@media(max-width:700px) {.rfid-report{padding:12px}.rfid-report-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.rfid-report-summary{grid-template-columns:110px minmax(0,1fr)}.rfid-report-table{max-height:60vh}}

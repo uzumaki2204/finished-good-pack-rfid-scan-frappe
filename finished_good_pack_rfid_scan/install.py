@@ -6,7 +6,7 @@ from finished_good_pack_rfid_scan.i18n import message
 
 
 REQUIRED_DOCTYPES = ("Company", "Market", "Factory Device")
-ROLES = ("RFID Scan Manager", "RFID Scan Operator")
+ROLES = ("RFID Scan Manager", "RFID Scan Operator", "RFID Report Manager")
 
 
 def _roles():
@@ -39,6 +39,7 @@ def after_migrate():
 
     ensure_page()
     indexes = (
+        ("RFID Scan Session", ["session_started_at", "name"], "fg_rfid_report_date"),
         ("RFID Scan Session", ["company", "status", "session_started_at"], "fg_rfid_session_scope"),
         ("RFID Booking Snapshot", ["session", "booking_id"], "fg_rfid_booking_scope"),
         ("RFID Scan Detail", ["company", "normalized_rfid"], "fg_rfid_duplicate_scope"),
