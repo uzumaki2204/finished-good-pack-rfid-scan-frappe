@@ -99,6 +99,7 @@
           <div class="form-group"><label for="completion-vehicle" data-i18n="ui.vehicle"></label><input id="completion-vehicle" class="form-control" autocomplete="off" required></div>
           <div class="form-group"><label for="completion-driver" data-i18n="ui.driver"></label><input id="completion-driver" class="form-control" autocomplete="off" required></div>
           <div class="form-group"><label for="completion-note" data-i18n="ui.note"></label><textarea id="completion-note" class="form-control" rows="3"></textarea></div>
+          <button id="completion-photos" type="button" class="btn btn-default btn-block mb-3" data-i18n="ui.photos"></button>
           <div class="d-flex">
             <button id="cancel-completion" type="button" class="btn btn-default flex-grow-1 mr-2" data-i18n="ui.cancel"></button>
             <button id="confirm-completion" type="button" class="btn btn-primary flex-grow-1" data-i18n="ui.confirm_completion"></button>
@@ -130,6 +131,7 @@
             <div id="scan-controls" class="d-flex align-items-center mb-2"><label for="rfid-input" class="sr-only" data-i18n="ui.scan_rfid"></label><input id="rfid-input" class="form-control" autocomplete="off" spellcheck="false" data-i18n-placeholder="ui.scan_rfid"><button id="toggle-scan" type="button" class="btn ml-2" aria-pressed="false" data-i18n="ui.pause_scan"></button></div>
             <div class="rfid-dock-actions">
               <button id="back-home" type="button" class="btn btn-default" data-i18n="ui.home"></button>
+              <button id="session-photos" type="button" class="btn btn-default" data-i18n="ui.photos" hidden></button>
               <button id="refresh-session" type="button" class="btn btn-primary" data-i18n="ui.refresh"></button>
               <button id="complete-session" type="button" class="btn btn-default" data-i18n="ui.complete_short"></button>
             </div>
@@ -158,4 +160,18 @@
       <button id="change-device" type="button" class="btn btn-danger btn-block" data-i18n="ui.clear_device"></button>
     </div>
   </dialog>
+  <dialog id="photo-dialog" aria-labelledby="photo-title">
+    <div class="rfid-dialog-header"><h2 id="photo-title" data-i18n="ui.photos"></h2><button id="close-photos" type="button" class="btn btn-default" data-i18n-aria="ui.close">×</button></div>
+    <div class="rfid-dialog-body">
+      <p class="text-muted" data-i18n="ui.photo_hint"></p>
+      <div class="rfid-photo-actions"><button id="choose-photos" type="button" class="btn btn-primary" data-i18n="ui.choose_photos"></button><button id="take-photo" type="button" class="btn btn-default" data-i18n="ui.take_photo"></button></div>
+      <input id="photo-files" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+      <input id="photo-camera" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden>
+      <p id="photo-status" role="status" aria-live="polite"></p>
+      <div id="photo-queue"></div><div id="photo-grid"></div>
+      <button id="more-photos" type="button" class="btn btn-default btn-block" data-i18n="ui.more_photos" hidden></button>
+      <button id="reload-photos" type="button" class="btn btn-default btn-block" data-i18n="ui.refresh"></button>
+    </div>
+  </dialog>
+  <dialog id="photo-viewer" aria-label="Photo"><button id="close-photo-viewer" type="button" class="btn btn-default" data-i18n="ui.close"></button><img id="photo-full" alt=""></dialog>
 </main>

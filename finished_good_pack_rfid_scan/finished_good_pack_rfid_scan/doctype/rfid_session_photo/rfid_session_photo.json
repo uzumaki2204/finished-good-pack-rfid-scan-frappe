@@ -1,0 +1,104 @@
+{
+  "doctype": "DocType",
+  "name": "RFID Session Photo",
+  "module": "Finished Good Pack RFID Scan",
+  "autoname": "RFID-PHOTO-.##########",
+  "track_changes": 1,
+  "fields": [
+    {
+      "fieldname": "session",
+      "label": "Session",
+      "fieldtype": "Link",
+      "read_only": 1,
+      "options": "RFID Scan Session",
+      "reqd": 1
+    },
+    {
+      "fieldname": "company",
+      "label": "Company",
+      "fieldtype": "Link",
+      "read_only": 1,
+      "options": "Company",
+      "reqd": 1
+    },
+    {
+      "fieldname": "device",
+      "label": "Device",
+      "fieldtype": "Link",
+      "read_only": 1,
+      "options": "Factory Device",
+      "reqd": 1
+    },
+    {
+      "fieldname": "request_key",
+      "label": "Request key",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "reqd": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "original_name",
+      "label": "Original name",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "image_file",
+      "label": "Image file",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "thumbnail_file",
+      "label": "Thumbnail file",
+      "fieldtype": "Data",
+      "read_only": 1
+    },
+    {
+      "fieldname": "width",
+      "label": "Width",
+      "fieldtype": "Int",
+      "read_only": 1
+    },
+    {
+      "fieldname": "height",
+      "label": "Height",
+      "fieldtype": "Int",
+      "read_only": 1
+    },
+    {
+      "fieldname": "byte_size",
+      "label": "Stored bytes",
+      "fieldtype": "Int",
+      "read_only": 1
+    },
+    {
+      "fieldname": "deleted",
+      "label": "Deleted",
+      "fieldtype": "Check",
+      "read_only": 1
+    }
+  ],
+  "field_order": [
+    "session",
+    "company",
+    "device",
+    "request_key",
+    "original_name",
+    "image_file",
+    "thumbnail_file",
+    "width",
+    "height",
+    "byte_size",
+    "deleted"
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": 1
+    }
+  ],
+  "sort_field": "creation",
+  "sort_order": "DESC"
+}

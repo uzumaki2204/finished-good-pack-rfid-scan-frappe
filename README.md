@@ -81,3 +81,19 @@ Bản `0.1.22` cập nhật giao diện theo RFID Scan: khung 480px, thẻ thố
 Bản `0.1.23` đồng bộ trang tạo phiên, lịch sử, kích hoạt và thông tin thiết bị với giao diện RFID mẫu. Trang chủ có tab Phiên quét/Lịch sử, booking dạng danh sách, thẻ phiên có trạng thái và chỉ số, hộp thoại thiết bị hỗ trợ bàn phím. Chỉ số Thùng đã scan trên lịch sử là số thùng đã có RFID, không phải số thùng quét đủ. Patch cập nhật Web Page khi migrate; service worker v18.
 
 Bản `0.1.24` giữ Trang chủ/Làm mới/Hoàn thành ở thanh cố định dưới cùng cả khi xem lịch sử. Phiên đã hoàn thành ẩn ô quét, khóa Làm mới/Hoàn thành và bỏ phần hiển thị biển số xe, tài xế, ghi chú trên màn hình phiên. Form nhập lúc hoàn thành vẫn được giữ. Patch cập nhật Web Page; service worker v19.
+
+## Ảnh phiên RFID (0.1.25)
+
+Form hoàn thành và thanh thao tác phiên lịch sử có nút **Hình ảnh**. Ảnh tùy chọn, không giới hạn số lượng mỗi phiên; thư viện tải 24 ảnh/lần. Chỉ tải khi có mạng, có tiến trình từng ảnh, thử lại và xác nhận xóa. Không lưu hàng đợi ảnh offline. Đóng thư viện khi có ảnh lỗi yêu cầu xác nhận bỏ các ảnh chưa tải; ảnh đã lưu vẫn giữ nếu hủy form hoàn thành.
+
+Máy chủ chỉ nhận JPEG, PNG, WebP tĩnh, tối đa 20 MiB và 40 triệu pixel mỗi ảnh. Pillow sửa chiều xoay EXIF, thu nhỏ cạnh dài đến 2048px (không phóng lớn), chuyển WebP quality 80 và xóa metadata. Thumbnail tối đa 320px. Không giữ bản gốc. File riêng tư gắn vào RFID Session Photo; mỗi API kiểm tra lại thiết bị được duyệt, công ty và thiết bị sở hữu phiên. Request UUID ngăn retry tạo bản sao; bản ghi xóa giữ request key để tránh retry khôi phục ảnh.
+
+API mới:
+- POST `/api/method/finished_good_pack_rfid_scan.api.upload_photo`: multipart `deviceId`, `sessionId`, `requestId` (UUID), `file`.
+- GET `dispatch?operation=photos`: `deviceId`, `sessionId`, `before` tùy chọn; trả `items` và `nextCursor` (24 ảnh/trang).
+- GET `/api/method/finished_good_pack_rfid_scan.api.photo_content`: `deviceId`, `sessionId`, `photoId`, `thumbnail=1` tùy chọn; trả WebP với `Cache-Control: private, no-store`.
+- POST `dispatch?operation=delete_photo`: JSON `deviceId`, `sessionId`, `photoId`; xóa cả hai File sau commit bằng lifecycle Frappe.
+
+Upload và API JSON giữ envelope `message: {success, data, errorCode?, message}`. Không trả URL file nội bộ. Khi dùng phiên đăng nhập Frappe, POST gửi CSRF token. Proxy phải cho phép multipart trên 20 MiB cộng phần header; không tăng quyền hay bỏ kiểm tra thiết bị.
+
+Cập nhật bằng Pilot, migrate để tạo DocType và áp dụng patch `v0_1_25_session_photos`. Service worker v20 nạp module ảnh mới. Dependency Pillow >=12,<13 được cài cùng app. Kiểm thử: `python -m unittest discover -s tests -v` và `node --check finished_good_pack_rfid_scan/public/rfid/photos.js`.

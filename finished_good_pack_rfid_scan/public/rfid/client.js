@@ -283,6 +283,8 @@
     lockCompletionNavigation(state.refreshing || (editable && state.completing));
     show('scan-dock', !state.completing);
     show('scan-controls', editable);
+    show('session-photos', !editable);
+    show('refresh-session', editable);
     $('refresh-session').disabled = !editable || state.refreshing;
     $('complete-session').disabled = !editable || state.refreshing;
     show('scan-dock-spacer', !state.completing);
@@ -554,7 +556,7 @@
     } catch { notice('error.offline_storage', 'danger'); }
   };
   const canCaptureScans = () => state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending && !state.scanPaused && !state.refreshing
-    && !$('device-info-modal').open && !$('session-view').hidden && !$('scan-dock').hidden && $('item-detail-modal').hidden;
+    && !$('photo-dialog').open && !$('device-info-modal').open && !$('session-view').hidden && !$('scan-dock').hidden && $('item-detail-modal').hidden;
   const enqueueScan = (rfid, focusAfter = false, sessionId = state.session?.sessionId) => {
     if (!sessionId) return Promise.resolve();
     scanQueue = scanQueue.catch(() => {}).then(() => addScan(rfid, sessionId, focusAfter));
@@ -702,10 +704,11 @@
       return;
     }
     state.completionPending = true;
-    const pendingControls = ['confirm-completion', 'cancel-completion'];
+    const pendingControls = ['confirm-completion', 'cancel-completion', 'completion-photos'];
     for (const id of pendingControls) $(id).disabled = true;
     let total = 0;
     try {
+      if (!await window.RfidPhotos.prepareCompletion(state.session.sessionId)) return;
       const scans = await scansForSession();
       total = scans.length;
       state.completionProgress = { phase: 'uploading', uploaded: 0, total };
@@ -826,6 +829,7 @@
   const init = async () => {
     expandPageShell();
     i18n.render(); renderNetwork();
+    window.RfidPhotos.init({ api, context: () => ({ deviceId: state.device?.id, sessionId: state.session?.sessionId }) });
     window.addEventListener('online', renderNetwork); window.addEventListener('offline', renderNetwork);
     $('activate-device').onclick = () => activate(value('device-id'));
     $('check-device').onclick = () => activate(value('device-id'));

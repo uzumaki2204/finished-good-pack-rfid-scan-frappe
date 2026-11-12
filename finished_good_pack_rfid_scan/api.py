@@ -4,12 +4,13 @@ import traceback
 
 import frappe
 
-from finished_good_pack_rfid_scan import service
+from finished_good_pack_rfid_scan import service, photos
 from finished_good_pack_rfid_scan.errors import RfidError
 from finished_good_pack_rfid_scan.i18n import message
 
 
 READ = {
+    "photos": lambda d: photos.list_photos(_device(d), d.get("sessionId"), d.get("before")),
     "device_check": lambda d: service.device_check(_device(d)),
     "active": lambda d: service.active_sessions(_device(d)),
     "history": lambda d: service.history(_device(d), d.get("status", "Completed"), d.get("pageIndex", 1)),
@@ -17,6 +18,7 @@ READ = {
     "preview_conflicts": lambda d: service.preview_conflicts(_device(d), _array(d.get("bookingIds"))),
 }
 WRITE = {
+    "delete_photo": lambda d: photos.delete(_device(d), d.get("sessionId"), d.get("photoId")),
     "start": lambda d: service.start_session(_device(d), d.get("bookingIds"), d.get("vehiclePlateNumber"),
                                              d.get("driverFullName"), d.get("confirmConflicts") is True),
     "preload": lambda d: service.preload(_device(d), d.get("bookingId"), d.get("sessionId")),
@@ -91,3 +93,43 @@ def dispatch(operation=None):
         frappe.local.response.http_status_code = 500
         return {"success": False, "data": None, "errorCode": "error.unexpected",
                 "message": message("error.unexpected")}
+
+
+def _photo_response(action):
+    try:
+        return action()
+    except RfidError as error:
+        if frappe.request.method == "POST":
+            frappe.db.rollback()
+        frappe.local.response.http_status_code = error.status
+        return {"success": False, "data": None, "errorCode": error.key, "message": str(error)}
+    except Exception:
+        if frappe.request.method == "POST":
+            frappe.db.rollback()
+        frappe.log_error(title="RFID photo operation", message=traceback.format_exc())
+        frappe.local.response.http_status_code = 500
+        return {"success": False, "data": None, "errorCode": "error.unexpected",
+                "message": message("error.unexpected")}
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def upload_photo():
+    def run():
+        data = frappe.form_dict
+        result = photos.upload(_device(data), data.get("sessionId"), data.get("requestId"),
+                               frappe.request.files.get("file"))
+        return {"success": True, "data": result, "message": ""}
+    return _photo_response(run)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def photo_content(deviceId=None, sessionId=None, photoId=None, thumbnail=None):
+    def run():
+        from werkzeug.wrappers import Response
+
+        content = photos.read(deviceId, sessionId, photoId, thumbnail == "1")
+        return Response(content, mimetype="image/webp", headers={
+            "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": 'inline; filename="rfid-photo.webp"',
+        })
+    return _photo_response(run)

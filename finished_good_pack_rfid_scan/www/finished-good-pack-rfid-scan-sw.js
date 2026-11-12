@@ -1,8 +1,9 @@
 /* Same-origin tablet shell only. API and SOAP data are never service-worker cached. */
-const CACHE = 'finished-good-pack-rfid-scan-v19';
+const CACHE = 'finished-good-pack-rfid-scan-v20';
 const PAGE = '/finished-good-pack-rfid-scan';
 const ASSETS = [
   PAGE,
+  '/assets/finished_good_pack_rfid_scan/rfid/photos.js',
   '/assets/finished_good_pack_rfid_scan/rfid/scan.css',
   '/assets/finished_good_pack_rfid_scan/rfid/logo.png',
   '/assets/finished_good_pack_rfid_scan/rfid/i18n.js',

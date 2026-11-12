@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Finished Good Pack RFID Scan API
-  version: 0.1.0
+  version: 0.1.25
   description: Frappe v16 tablet endpoint. Responses use the standard Frappe message wrapper. Device IDs below are examples only.
 servers:
   - url: https://frappe.example.invalid
@@ -16,7 +16,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [device_check, active, history, session, preview_conflicts]
+            enum: [device_check, active, history, session, preview_conflicts, photos]
         - in: query
           name: deviceId
           required: true
@@ -59,7 +59,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [start, preload, refresh_delta, rehydrate, complete, delete]
+            enum: [start, preload, refresh_delta, rehydrate, complete, delete, delete_photo]
       requestBody:
         required: true
         content:
@@ -111,6 +111,54 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FrappeResponse' }
+  /api/method/finished_good_pack_rfid_scan.api.upload_photo:
+    post:
+      operationId: uploadSessionPhoto
+      summary: Optimize and store an optional private session photo (idempotent by requestId)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [deviceId, sessionId, requestId, file]
+              properties:
+                deviceId: {type: string}
+                sessionId: {type: string}
+                requestId: {type: string, format: uuid}
+                file: {type: string, format: binary, description: Static JPEG/PNG/WebP up to 20 MiB and 40 megapixels}
+      responses:
+        '200':
+          description: Photo metadata inside the standard envelope; no private file path
+        '400':
+          description: Invalid image or request
+        '403':
+          description: Device cannot access this session
+        '404':
+          description: Session not found or deleted
+        '409':
+          description: Request ID refers to a deleted upload
+        '413':
+          description: Byte or pixel limit exceeded
+  /api/method/finished_good_pack_rfid_scan.api.photo_content:
+    get:
+      operationId: readSessionPhoto
+      summary: Read an authorized private WebP image without caching
+      parameters:
+        - {in: query, name: deviceId, required: true, schema: {type: string}}
+        - {in: query, name: sessionId, required: true, schema: {type: string}}
+        - {in: query, name: photoId, required: true, schema: {type: string}}
+        - {in: query, name: thumbnail, schema: {type: string, enum: ['0', '1']}}
+      responses:
+        '200':
+          description: Optimized image or thumbnail
+          content:
+            image/webp:
+              schema: {type: string, format: binary}
+        '403':
+          description: Device cannot access this session
+        '404':
+          description: Photo or session not found
 components:
   schemas:
     FrappeResponse:
