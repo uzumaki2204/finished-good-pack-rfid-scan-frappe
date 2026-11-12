@@ -111,6 +111,40 @@ class PhotoPolicyTest(unittest.TestCase):
                 photos.upload("D", "S", "ca31a034-b8f5-4c4c-9a91-e9ccc9c70965", None)
             self.assertEqual(error.exception.status, 409)
 
+    def test_completed_session_retry_does_not_write_scans_again(self):
+        with patch.object(service, "approved_device", return_value=self.device), \
+             patch.object(service, "_session", return_value=self.session), \
+             patch.object(service, "_details", return_value={"sessionStatus": "Completed"}), \
+             patch.object(service, "validate_scans") as validate:
+            result = service.complete("D", "S", "", "", "", [])
+        self.assertEqual(result["sessionStatus"], "Completed")
+        validate.assert_not_called()
+
+    def test_upload_stores_only_private_optimized_files(self):
+        row = MagicMock(original_name="test.png", width=48, height=32, byte_size=100, creation="now")
+        row.name = "P"
+        row.insert.return_value = row
+        files = []
+        def make_doc(data):
+            if data["doctype"] == photos.DOCTYPE:
+                return row
+            files.append(data)
+            file = MagicMock()
+            file.name = f"F{len(files)}"
+            return file
+        uploaded = types.SimpleNamespace(filename="test.png", stream=BytesIO(image_bytes()))
+        with patch.object(photos, "authorize", return_value=(self.session, self.device)), \
+             patch.object(photos.frappe, "db", types.SimpleNamespace(get_value=lambda *_: None), create=True), \
+             patch.object(photos.frappe, "get_doc", side_effect=make_doc, create=True):
+            photos.upload("D", "S", "ca31a034-b8f5-4c4c-9a91-e9ccc9c70965", uploaded)
+        self.assertEqual(len(files), 2)
+        for file in files:
+            self.assertEqual(file["is_private"], 1)
+            self.assertEqual(file["owner"], "Administrator")
+            self.assertEqual(file["attached_to_name"], "P")
+            with Image.open(BytesIO(file["content"])) as saved:
+                self.assertEqual(saved.format, "WEBP")
+
     def test_photo_id_from_another_session_rejected(self):
         with patch.object(photos, "authorize"), \
              patch.object(photos.frappe, "db", types.SimpleNamespace(exists=lambda *_: True), create=True), \

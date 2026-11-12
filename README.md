@@ -96,4 +96,4 @@ API mới:
 
 Upload và API JSON giữ envelope `message: {success, data, errorCode?, message}`. Không trả URL file nội bộ. Khi dùng phiên đăng nhập Frappe, POST gửi CSRF token. Proxy phải cho phép multipart trên 20 MiB cộng phần header; không tăng quyền hay bỏ kiểm tra thiết bị.
 
-Cập nhật bằng Pilot, migrate để tạo DocType và áp dụng patch `v0_1_25_session_photos`. Service worker v20 nạp module ảnh mới. Dependency Pillow >=12,<13 được cài cùng app. Kiểm thử: `python -m unittest discover -s tests -v` và `node --check finished_good_pack_rfid_scan/public/rfid/photos.js`.
+Cập nhật bằng Pilot, migrate để tạo DocType và áp dụng patch `v0_1_25_session_photos`. Service worker v20 nạp module ảnh mới. Dependency Pillow >=12,<14 được cài cùng app. Kiểm thử: `python -m unittest discover -s tests -v` và `node --check finished_good_pack_rfid_scan/public/rfid/photos.js`.
