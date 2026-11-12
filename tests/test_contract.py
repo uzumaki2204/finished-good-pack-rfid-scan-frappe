@@ -28,11 +28,11 @@ class ContractTest(unittest.TestCase):
             self.assertEqual(data["field_order"], [row["fieldname"] for row in data["fields"]])
         self.assertEqual((PACKAGE / "modules.txt").read_text(encoding="utf-8").strip(), "Finished Good Pack RFID Scan")
 
-    def test_no_custom_css_or_secret_in_packaged_assets(self):
-        self.assertEqual(list(PACKAGE.rglob("*.css")), [])
+    def test_scoped_scan_styles_and_migration_are_packaged(self):
+        self.assertTrue((PACKAGE / "public" / "rfid" / "scan.css").is_file())
         html = (PACKAGE / "templates" / "includes" / "tablet_head.html").read_text(encoding="utf-8")
         self.assertIn("desk.bundle.css", html)
-        self.assertNotIn("site.css", html)
+        self.assertIn("/rfid/scan.css?v=", html)
         patches = (PACKAGE / "patches.txt").read_text(encoding="utf-8")
         self.assertIn("[pre_model_sync]", patches)
         self.assertIn("[post_model_sync]", patches)

@@ -4,7 +4,7 @@
   const store = window.RfidOffline;
   const $ = id => document.getElementById(id);
   const state = { device: null, session: null, renderedSessionId: null, stream: null, cameraTimer: null, returnView: null,
-    activeSessionTab: 'po', activeBoxFilter: 'not-scanned', boxSearch: '', sessionRows: null, completing: false, completionPending: false, completionProgress: null };
+    scanPaused: false, refreshing: false, activeSessionTab: 'po', activeBoxFilter: 'not-scanned', boxSearch: '', sessionRows: null, completing: false, completionPending: false, completionProgress: null };
   const SCAN_COMMIT_DELAY_MS = 60;
   let scannerCommitTimer = null;
   let lastFocusedRfidKeyAt = 0;
@@ -86,6 +86,8 @@
   const views = name => {
     for (const id of ['device-view', 'home-view', 'session-view']) show(id, id === name);
     show('back-home', name === 'session-view');
+    $('screen-title').textContent = i18n.text(name === 'session-view' ? 'ui.scan_session' : 'ui.title');
+    show('session-booking', name === 'session-view');
   };
   const table = (target, columns, rows, emptyKey = 'ui.empty_rows', tableClass = 'table table-bordered') => {
     const parent = $(target);
@@ -109,6 +111,7 @@
       button.setAttribute('aria-pressed', String(active));
     }
     const rows = (state.sessionRows?.boxes || []).filter(row => boxStatus(row) === state.activeBoxFilter
+      && (!state.boxScope || (row.bookingId === state.boxScope.bookingId && row.orderNo === state.boxScope.orderNo))
       && String(row.label || '').toLocaleLowerCase().includes(state.boxSearch));
     table('box-list', [['ui.boxes', row => row.label || i18n.text('ui.not_available')], ['ui.scanned', row => row.progress]], rows);
   };
@@ -197,7 +200,25 @@
   const renderSelectedSessionTab = () => {
     const rows = state.sessionRows;
     if (!rows) return;
-    if (state.activeSessionTab === 'po') table('po-list', [['ui.po', row => row.label || i18n.text('ui.not_available')], ['ui.boxes', row => row.progress]], rows.po, 'ui.empty_rows', 'table table-borderless mb-0');
+    if (state.activeSessionTab === 'po') {
+      const parent = $('po-list'); parent.replaceChildren();
+      if (!rows.po.length) parent.append(node('p', 'text-muted', i18n.text('ui.empty_rows')));
+      for (const row of rows.po) {
+        const card = node('article', 'rfid-po-card');
+        const info = node('div', 'rfid-po-info');
+        info.append(node('strong', 'd-block', row.label || i18n.text('ui.not_available')),
+          node('small', 'text-muted d-block', i18n.text('ui.item_booking', { booking: row.bookingId })),
+          node('small', 'text-muted d-block', i18n.text('ui.po_summary', { count: rows.items.filter(item => item.bookingId === row.bookingId && item.orderNo === row.label).length, progress: row.progress })));
+        const actions = node('div', 'text-right');
+        const button = node('button', 'btn btn-default btn-sm mt-1', i18n.text('ui.view_boxes'));
+        button.type = 'button'; button.onclick = () => {
+          state.boxScope = { bookingId: row.bookingId, orderNo: row.label };
+          selectSessionTab('boxes', true);
+        };
+        actions.append(node('strong', 'd-block text-nowrap', row.progress), button);
+        card.append(info, actions); parent.append(card);
+      }
+    }
     else if (state.activeSessionTab === 'items') renderItemList(rows.items);
     else if (state.activeSessionTab === 'boxes') renderBoxList();
   };
@@ -237,11 +258,13 @@
     if (!s) return;
     closeItemDetail();
     if (state.renderedSessionId !== s.sessionId) {
-      state.renderedSessionId = s.sessionId;
+      state.renderedSessionId = s.sessionId; state.scanPaused = false; state.boxScope = null; renderScanMode();
       state.activeSessionTab = 'po'; state.activeBoxFilter = 'not-scanned'; state.boxSearch = ''; state.completing = false; state.completionProgress = null;
       $('box-search').value = '';
     }
     views('session-view');
+    $('session-booking').textContent = `Booking: ${(s.preloadedBookings || []).map(b => b.displayBookingId || b.bookingId).join(', ')}`;
+    show('completed-home', s.sessionStatus === 'Completed');
     let local = [];
     let storageReady = true;
     if (s.sessionStatus !== 'Completed') {
@@ -257,7 +280,7 @@
     }).length;
     const editable = s.sessionStatus === 'Active';
     if (!editable) state.completing = false;
-    lockCompletionNavigation(editable && state.completing);
+    lockCompletionNavigation(state.refreshing || (editable && state.completing));
     show('scan-dock', editable && !state.completing);
     show('scan-dock-spacer', editable && !state.completing);
     show('completion-form', editable && state.completing);
@@ -283,7 +306,7 @@
         if (!poBoxKeys.has(poKey)) poBoxKeys.set(poKey, new Set());
         poBoxKeys.get(poKey).add(boxKey);
         for (const [map, signature, label] of [[po, poKey, item.orderNo], [boxes, boxKey, item.dispPackNum]]) {
-          const row = map.get(signature) || { label, total: 0, scanned: 0 };
+          const row = map.get(signature) || { label, bookingId, orderNo: item.orderNo, total: 0, scanned: 0 };
           row.total += 1; row.scanned += Number(found); map.set(signature, row);
         }
         const itemCode = item.sampleCode || item.itemCode || '';
@@ -358,7 +381,7 @@
     const poRows = [...po.entries()].map(([signature, row]) => {
       const boxKeys = poBoxKeys.get(signature) || new Set();
       const completed = [...boxKeys].filter(key => boxes.get(key)?.scanned === boxes.get(key)?.total).length;
-      return { label: row.label, progress: `${completed}/${boxKeys.size + (poPendingBoxes.get(signature) || 0)}` };
+      return { label: row.label, bookingId: row.bookingId, progress: `${completed}/${boxKeys.size + (poPendingBoxes.get(signature) || 0)}` };
     });
     const itemRows = [...items.values()].map(row => ({
       label: row.label, bookingId: row.bookingId, orderNo: row.orderNo, total: row.total, scanned: row.scanned,
@@ -510,7 +533,7 @@
       notice('success.scan_saved', 'success'); await renderSession();
     } catch { notice('error.offline_storage', 'danger'); }
   };
-  const canCaptureScans = () => state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending
+  const canCaptureScans = () => state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending && !state.scanPaused && !state.refreshing
     && !$('session-view').hidden && !$('scan-dock').hidden && $('item-detail-modal').hidden;
   const enqueueScan = (rfid, focusAfter = false, sessionId = state.session?.sessionId) => {
     if (!sessionId) return Promise.resolve();
@@ -729,6 +752,29 @@
       }, 500);
     } catch { stopCamera(); notice('error.camera_failed', 'danger'); }
   };
+  const renderScanMode = () => {
+    $('toggle-scan').textContent = i18n.text(state.scanPaused ? 'ui.resume_scan' : 'ui.pause_scan');
+    $('toggle-scan').setAttribute('aria-pressed', String(state.scanPaused));
+    $('rfid-input').disabled = state.scanPaused || state.refreshing;
+  };
+  const refreshSession = async () => {
+    if (state.refreshing || state.session?.sessionStatus !== 'Active') return;
+    if (!navigator.onLine) return notice('ui.network_required', 'warning');
+    state.refreshing = true; resetScannerBuffer(); renderScanMode();
+    const controls = ['back-home', 'device-settings', 'refresh-session', 'complete-session', 'toggle-scan'];
+    controls.forEach(id => { $(id).disabled = true; });
+    try {
+      await scanQueue;
+      for (const booking of [...(state.session.preloadedBookings || [])]) {
+        const result = await api('refresh_delta', { sessionId: state.session.sessionId, bookingId: booking.bookingId }, 'POST');
+        await saveSession(result.session);
+      }
+      notice('success.booking_refreshed', 'success');
+    } catch (error) { explain(error); }
+    finally {
+      state.refreshing = false; controls.forEach(id => { $(id).disabled = false; }); renderScanMode();
+    }
+  };
   const init = async () => {
     expandPageShell();
     i18n.render(); renderNetwork();
@@ -755,14 +801,26 @@
     $('start-session').onclick = start;
     $('refresh-active').onclick = loadHome; $('refresh-history').onclick = loadHome;
     $('back-home').onclick = async () => { resetScannerBuffer(); state.session = null; resetSessionNavigation(); await store.remove('meta', 'currentSession'); await loadHome(); };
-    $('add-scan').onclick = () => { void enqueueScan($('rfid-input').value, true); };
+    $('completed-home').onclick = () => $('back-home').click();
+    $('toggle-scan').onclick = () => {
+      resetScannerBuffer(); state.scanPaused = !state.scanPaused; renderScanMode();
+      if (!state.scanPaused) $('rfid-input').focus();
+    };
+    $('refresh-session').onclick = refreshSession;
+    $('theme-toggle').onclick = () => {
+      const dark = $('rfid-app').classList.toggle('rfid-dark');
+      $('theme-toggle').setAttribute('aria-pressed', String(dark));
+      $('theme-toggle').textContent = dark ? '☀' : '☾';
+      try { localStorage.setItem('rfid-theme', dark ? 'dark' : 'light'); } catch { /* Theme is optional. */ }
+    };
+    try { if (localStorage.getItem('rfid-theme') === 'dark') $('theme-toggle').click(); } catch { /* Theme is optional. */ }
     document.addEventListener('keydown', handleScannerKeyDown);
     document.addEventListener('beforeinput', handleScannerBeforeInput);
     document.addEventListener('paste', handleScannerPaste);
     $('complete-session').onclick = beginCompletion;
     $('cancel-completion').onclick = cancelCompletion; $('confirm-completion').onclick = complete;
     for (const button of document.querySelectorAll('[data-session-tab]')) {
-      button.onclick = () => selectSessionTab(button.dataset.sessionTab);
+      button.onclick = () => { state.boxScope = null; selectSessionTab(button.dataset.sessionTab); };
       button.onkeydown = event => navigateTabsWithKeyboard(event, SESSION_TABS, button.dataset.sessionTab, selectSessionTab);
     }
     for (const button of document.querySelectorAll('[data-box-filter]')) {
@@ -770,7 +828,7 @@
       button.onkeydown = event => navigateTabsWithKeyboard(event, BOX_FILTERS, button.dataset.boxFilter, selectBoxFilter);
     }
     $('box-search').oninput = () => { state.boxSearch = value('box-search').toLocaleLowerCase(); renderBoxList(); };
-    $('clear-box-search').onclick = () => { $('box-search').value = ''; state.boxSearch = ''; renderBoxList(); $('box-search').focus(); };
+    $('clear-box-search').onclick = () => { $('box-search').value = ''; state.boxSearch = ''; state.boxScope = null; renderBoxList(); $('box-search').focus(); };
     $('close-item-detail').onclick = closeItemDetail;
     $('item-detail-modal').onclick = event => { if (event.target === $('item-detail-modal')) closeItemDetail(); };
     $('item-detail-modal').onkeydown = event => {

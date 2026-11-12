@@ -1,6 +1,6 @@
 # Finished Good Pack RFID Scan for Frappe 16
 
-App độc lập cho quét RFID thành phẩm theo booking. Module **Finished Good Pack RFID Scan** xuất hiện trong Desk; trang `/finished-good-pack-rfid-scan` bố trí một cột giữa màn hình trên điện thoại, có logo và nút header dạng icon. Giao diện dùng class Desk/Bootstrap mặc định của Frappe, không có CSS riêng. Patch cập nhật HTML của Web Page khi nâng cấp app.
+App độc lập cho quét RFID thành phẩm theo booking. Module **Finished Good Pack RFID Scan** xuất hiện trong Desk; trang `/finished-good-pack-rfid-scan` bố trí một cột giữa màn hình trên điện thoại, có logo và nút header dạng icon. Giao diện dùng nền Desk/Bootstrap của Frappe và CSS riêng được giới hạn trong `#rfid-app`. Patch cập nhật HTML của Web Page khi nâng cấp app.
 
 ## Phạm vi dữ liệu
 
@@ -75,3 +75,5 @@ node --check finished_good_pack_rfid_scan/public/rfid/client.js
 ```
 
 Chưa thể kiểm thử SOAP thực, Pilot migration, HTTPS/camera và luồng tablet trên site Frappe trong repo cục bộ. Trước khi vận hành, chạy thử trên site pilot với tài khoản SOAP và thiết bị thử nghiệm của từng Company.
+
+Bản `0.1.22` cập nhật giao diện theo RFID Scan: khung 480px, thẻ thống kê gradient, danh sách PO dạng thẻ, giao diện sáng/tối, thanh quét cố định với tạm dừng/tiếp tục, Trang chủ, Làm mới booking và Hoàn thành. Giữ ba tab hiện tại. Patch cập nhật Web Page khi migrate; service worker v17 nạp CSS và client mới.

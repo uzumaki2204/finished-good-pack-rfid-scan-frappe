@@ -4,7 +4,7 @@
       <header class="d-flex align-items-center justify-content-between mb-3">
         <div class="d-flex align-items-center">
           <img src="/assets/finished_good_pack_rfid_scan/rfid/logo.png" class="bg-white rounded mr-2" width="44" height="44" alt="">
-          <h1 class="h5 mb-0" data-i18n="ui.title"></h1>
+          <div class="rfid-heading"><h1 id="screen-title" class="h5 mb-0" data-i18n="ui.title"></h1><small id="session-booking" class="text-muted" hidden></small></div>
         </div>
         <div class="d-flex align-items-center">
           <span id="network-status" class="text-success mr-2" role="status" aria-live="polite" data-i18n-aria="ui.online">
@@ -14,9 +14,7 @@
           <button id="device-settings" type="button" class="btn btn-default p-3" data-i18n-aria="ui.device_settings" data-i18n-title="ui.device_settings">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2"></rect><path d="M10 5.5h4M11 18.5h2"></path></svg>
           </button>
-          <button id="back-home" type="button" class="btn btn-default p-3 ml-2" data-i18n-aria="ui.home" data-i18n-title="ui.home" hidden>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"></path></svg>
-          </button>
+          <button id="theme-toggle" type="button" class="btn btn-default" data-i18n-aria="ui.toggle_theme" title="Đổi giao diện" aria-pressed="false">☾</button>
         </div>
       </header>
       <div id="notice" class="alert" role="status" aria-live="polite" hidden></div>
@@ -87,6 +85,7 @@
             <div class="col-4 px-1"><div class="alert alert-warning text-center p-2 mb-0 h-100"><small class="d-block text-dark" data-i18n="ui.boxes"></small><strong id="metric-boxes" class="d-block h5 mb-0"></strong></div></div>
           </div>
           <div id="session-warnings" class="alert alert-warning" hidden></div>
+          <button id="completed-home" type="button" class="btn btn-default mb-2" data-i18n="ui.home" hidden></button>
           <div id="completed-details" class="row" hidden>
             <div class="col-12 col-sm-6 mb-2"><small class="text-muted d-block" data-i18n="ui.vehicle"></small><strong id="completed-vehicle" class="text-break"></strong></div>
             <div class="col-12 col-sm-6 mb-2"><small class="text-muted d-block" data-i18n="ui.driver"></small><strong id="completed-driver" class="text-break"></strong></div>
@@ -106,7 +105,7 @@
         </section>
         <p id="completion-upload-status" class="alert alert-info mb-3" role="status" aria-live="polite" hidden></p>
 
-        <div class="text-center mb-3">
+        <div class="rfid-session-tabs text-center mb-3">
           <div class="btn-group btn-group-sm d-flex" role="tablist" data-i18n-aria="ui.session_tabs">
             <button id="tab-po" type="button" class="btn btn-primary active small text-nowrap flex-fill px-1 py-3" role="tab" data-session-tab="po" aria-controls="panel-po" aria-selected="true" tabindex="0"><span data-i18n="ui.po"></span> <span id="tab-po-count" class="badge badge-light">0</span></button>
             <button id="tab-items" type="button" class="btn btn-default small text-nowrap flex-fill px-1 py-3" role="tab" data-session-tab="items" aria-controls="panel-items" aria-selected="false" tabindex="-1"><span data-i18n="ui.items"></span> <span id="tab-items-count" class="badge badge-light">0</span></button>
@@ -127,8 +126,12 @@
         <div id="scan-dock-spacer" class="py-5 mb-5" aria-hidden="true" hidden></div>
         <div id="scan-dock" class="fixed-bottom bg-white border-top shadow-sm py-2" hidden>
           <div class="container-fluid"><div class="row justify-content-center"><div class="col-12 col-sm-11 col-md-10 col-lg-8 col-xl-7">
-            <div id="scan-controls" class="d-flex align-items-center mb-2"><label for="rfid-input" class="sr-only" data-i18n="ui.scan_rfid"></label><input id="rfid-input" class="form-control" autocomplete="off" spellcheck="false" data-i18n-placeholder="ui.scan_rfid"><button id="add-scan" type="button" class="btn btn-primary ml-2" data-i18n="ui.add_scan"></button></div>
-            <button id="complete-session" type="button" class="btn btn-primary btn-block" data-i18n="ui.complete"></button>
+            <div id="scan-controls" class="d-flex align-items-center mb-2"><label for="rfid-input" class="sr-only" data-i18n="ui.scan_rfid"></label><input id="rfid-input" class="form-control" autocomplete="off" spellcheck="false" data-i18n-placeholder="ui.scan_rfid"><button id="toggle-scan" type="button" class="btn ml-2" aria-pressed="false" data-i18n="ui.pause_scan"></button></div>
+            <div class="rfid-dock-actions">
+              <button id="back-home" type="button" class="btn btn-default" data-i18n="ui.home"></button>
+              <button id="refresh-session" type="button" class="btn btn-primary" data-i18n="ui.refresh"></button>
+              <button id="complete-session" type="button" class="btn btn-default" data-i18n="ui.complete"></button>
+            </div>
           </div></div></div>
         </div>
       </section>

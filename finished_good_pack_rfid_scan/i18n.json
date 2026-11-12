@@ -146,7 +146,13 @@
     "warning.unmapped_boxes": "Còn {count} thùng chưa map RFID.",
     "warning.cross_session_duplicate": "Có {count} RFID đã xuất hiện ở phiên khác.",
     "diagnostic.soap_operation": "Yêu cầu SOAP {operation} không thành công.",
-    "diagnostic.api_operation": "Thao tác API {operation} không thành công."
+    "diagnostic.api_operation": "Thao tác API {operation} không thành công.",
+    "ui.pause_scan": "⏸ Tạm dừng",
+    "ui.resume_scan": "▶ Tiếp tục",
+    "ui.scan_session": "Phiên quét",
+    "ui.toggle_theme": "Đổi giao diện",
+    "ui.view_boxes": "Xem thùng",
+    "ui.po_summary": "{count} mã hàng • {progress} hoàn thành"
   },
   "en": {
     "app.description": "Booking-based finished good RFID scanning for Frappe.",
@@ -295,6 +301,12 @@
     "warning.unmapped_boxes": "{count} cartons are not mapped to RFID.",
     "warning.cross_session_duplicate": "{count} RFIDs have appeared in other sessions.",
     "diagnostic.soap_operation": "SOAP request {operation} failed.",
-    "diagnostic.api_operation": "API operation {operation} failed."
+    "diagnostic.api_operation": "API operation {operation} failed.",
+    "ui.pause_scan": "⏸ Pause",
+    "ui.resume_scan": "▶ Resume",
+    "ui.scan_session": "Scan session",
+    "ui.toggle_theme": "Toggle theme",
+    "ui.view_boxes": "View boxes",
+    "ui.po_summary": "{count} items • {progress} complete"
   }
 }
