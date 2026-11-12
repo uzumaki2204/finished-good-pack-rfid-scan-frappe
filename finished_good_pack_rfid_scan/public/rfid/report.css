@@ -30,3 +30,15 @@
 .rfid-report .rfid-report-action:hover:not(:disabled) {background:var(--btn-default-hover-bg,#e8eaed)}
 .rfid-report .rfid-report-action:focus-visible {outline:2px solid var(--primary,#1674a8);outline-offset:2px}
 .rfid-report-action svg {display:block;flex-shrink:0}
+
+/* Match the printed report heading without changing other Desk pages. */
+.rfid-report-page-head {height:auto;min-height:64px}
+.rfid-report-page-head .page-head-content {min-height:64px}
+.rfid-report-page-head .page-title {flex:1;min-width:0}
+.rfid-report-page-head .title-area {flex:1;min-width:0;justify-content:center;white-space:normal;overflow:visible}
+.rfid-report-page-head .navbar-breadcrumbs {max-width:100%;width:100%}
+.rfid-report-page-head .navbar-breadcrumbs ol {justify-content:center;flex-wrap:wrap}
+.rfid-report-page-head .es-breadcrumbs__item,
+.rfid-report-page-head .es-breadcrumbs__label,
+.rfid-report-page-head .title-text {font:700 clamp(18px,2.1vw,29.333px)/1.25 "Times New Roman",serif;color:#0070c0;text-align:center;white-space:normal;overflow:visible;text-overflow:clip;max-width:100%}
+.rfid-report-page-head .title-area {padding:12px 8px}

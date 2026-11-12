@@ -73,6 +73,9 @@
   }
   function mount(page) {
     const root = node('div', undefined, 'rfid-report'); page.main.append(root);
+    const pageHead = root.closest('.page-container')?.querySelector('.page-head');
+    pageHead?.classList.add('rfid-report-page-head');
+    const setHeading = detail => page.set_title(detail ? 'BÁO CÁO CHI TIẾT SCAN RFID LOAD CONT' : 'BÁO CÁO TỔNG QUAN SCAN RFID LOAD CONT');
     const filters = node('form', undefined, 'rfid-report-filters');
     const fields = {};
     const now = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -99,7 +102,7 @@
     }
     function error(target, action) {target.replaceChildren(node('p','Không thể tải dữ liệu. Vui lòng kiểm tra quyền truy cập hoặc thử lại.','text-danger'),button('Thử lại',action));}
     async function overview(pageIndex=1) {
-      const seq = ++request; selected = null; overviewPage = pageIndex;
+      const seq = ++request; selected = null; overviewPage = pageIndex; setHeading(false);
       filters.hidden = false; info.hidden = !info.textContent; print.disabled = true; content.replaceChildren(node('p','Đang tải báo cáo…'));
       const args = Object.fromEntries(Object.entries(fields).map(([key,el]) => [key, el.value.trim()]));
       if (!args.from_date || !args.to_date || args.from_date > args.to_date) {content.replaceChildren(node('p','Vui lòng chọn khoảng ngày hợp lệ.','text-danger'));return;}
@@ -110,7 +113,7 @@
       } catch {if(seq === request) error(content,()=>overview(pageIndex));}
     }
     async function open(id,pageIndex=1) {
-      const seq = ++request; selected = id; filters.hidden = true; info.hidden = true;
+      const seq = ++request; selected = id; setHeading(true); filters.hidden = true; info.hidden = true;
       content.replaceChildren(node('p','Đang tải chi tiết…'));
       try {
         const data = await call('detail',{session_id:id,page:pageIndex}); if(seq !== request) return;
