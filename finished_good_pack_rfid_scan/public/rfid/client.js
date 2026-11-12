@@ -294,7 +294,9 @@
       state.completionProgress = { phase: 'complete', uploaded: total, total };
     }
     renderCompletionProgress();
-    const warnings = s.planningWarnings || [];
+    const warnings = (s.planningWarnings || []).map(warning => String(warning)
+      .replace(/^Booking (.+): (\d+)\/(\d+) (?:cartons|thùng)\.$/, 'Booking $1: Số thùng thực tế ($2) khác số thùng kế hoạch ($3).')
+      .replace(/^(\d+) cartons are not mapped to RFID\.$/, 'Còn $1 thùng chưa được liên kết RFID.'));
     show('session-warnings', warnings.length > 0); $('session-warnings').replaceChildren(...warnings.map(w => { const p = document.createElement('p'); p.textContent = w; return p; }));
     const scannedIds = new Set(scans.map(x => `${x.bookingId}|${x.finishedGoodPackDetailId}`));
     const po = new Map(), items = new Map(), boxes = new Map(), poBoxKeys = new Map(), poPendingBoxes = new Map();
