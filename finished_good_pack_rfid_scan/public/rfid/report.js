@@ -16,6 +16,14 @@
   const button = (label, action, className = 'btn btn-default btn-sm') => {
     const el = node('button', label, className); el.type = 'button'; el.onclick = action; return el;
   };
+  const printButton = action => {
+    const el = button('', action, 'btn btn-default rfid-report-print');
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    for (const [key, value] of Object.entries({width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':1.8,'stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true'})) icon.setAttribute(key,value);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d','M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6zM18 12h.01');
+    icon.append(path); el.append(icon,node('span','In')); return el;
+  };
   const call = async (method, args = {}) => {
     const response = await frappe.call({method: API + method, args, type: 'GET'});
     if (!response || response.exc || response.message === undefined) throw new Error('Không thể tải báo cáo. Vui lòng thử lại.');
@@ -75,8 +83,11 @@
     const option = (select,label,value='') => {const el = node('option',label);el.value = value;select.append(el);};
     option(fields.company,'Tất cả công ty'); option(fields.device,'Tất cả thiết bị');
     option(fields.status,'Tất cả trạng thái'); option(fields.status,'Đang scan','Active'); option(fields.status,'Đã hoàn thành','Completed');
-    const load = button('Làm mới', () => overview(1), 'btn btn-primary'); filters.append(load);
-    const info = node('p','Lọc theo ngày bắt đầu phiên (giờ Việt Nam). Mỗi dòng là một phiên. Booking và PO tìm theo mã chính xác.','text-muted');
+    const load = button('Làm mới', () => overview(1), 'btn btn-primary');
+    const print = printButton(() => {}); print.disabled = true;
+    const filterActions = node('div', undefined, 'rfid-report-filter-actions');
+    filterActions.append(load,print); filters.append(filterActions);
+    const info = node('p','','text-danger'); info.hidden = true;
     const content = node('section'); root.append(filters,info,content);
     let request = 0, selected = null, overviewPage = 1, devices = [];
     function printReport(args) {
@@ -85,14 +96,13 @@
     function error(target, action) {target.replaceChildren(node('p','Không thể tải dữ liệu. Vui lòng kiểm tra quyền truy cập hoặc thử lại.','text-danger'),button('Thử lại',action));}
     async function overview(pageIndex=1) {
       const seq = ++request; selected = null; overviewPage = pageIndex;
-      filters.hidden = false; info.hidden = false; content.replaceChildren(node('p','Đang tải báo cáo…'));
+      filters.hidden = false; info.hidden = !info.textContent; print.disabled = true; content.replaceChildren(node('p','Đang tải báo cáo…'));
       const args = Object.fromEntries(Object.entries(fields).map(([key,el]) => [key, el.value.trim()]));
       if (!args.from_date || !args.to_date || args.from_date > args.to_date) {content.replaceChildren(node('p','Vui lòng chọn khoảng ngày hợp lệ.','text-danger'));return;}
       try {
         const data = await call('overview', {...args,page:pageIndex}); if(seq !== request) return;
-        const actions = node('div', undefined, 'rfid-report-actions');
-        actions.append(button('In', () => printReport(args)));
-        content.replaceChildren(actions,table(overviewColumns,data.items,open),pager(data,overview));
+        print.onclick = () => printReport(args); print.disabled = false;
+        content.replaceChildren(table(overviewColumns,data.items,open),pager(data,overview));
       } catch {if(seq === request) error(content,()=>overview(pageIndex));}
     }
     async function open(id,pageIndex=1) {
@@ -100,7 +110,7 @@
       content.replaceChildren(node('p','Đang tải chi tiết…'));
       try {
         const data = await call('detail',{session_id:id,page:pageIndex}); if(seq !== request) return;
-        const header = node('div',undefined,'rfid-report-actions'); header.append(button('← Tổng quan',()=>overview(overviewPage)),button('Làm mới',()=>open(id,pageIndex)),button('In',()=>printReport({session_id:id})));
+        const header = node('div',undefined,'rfid-report-actions'); header.append(button('← Tổng quan',()=>overview(overviewPage)),button('Làm mới',()=>open(id,pageIndex)),printButton(()=>printReport({session_id:id})));
         const title = node('h3',`Chi tiết phiên · ${data.session.bookingIds.join(', ')}`);
         const summary = node('dl',undefined,'rfid-report-summary');
         overviewColumns.forEach(([key,label,format])=>{summary.append(node('dt',label),node('dd',text(format?format(data.session[key]):data.session[key])));});
@@ -141,7 +151,7 @@
     };
     call('options').then(data=>{
       data.companies.forEach(c=>option(fields.company,c.company_name||c.name,c.name));devices=data.devices;fields.company.onchange();
-    }).catch(()=>{info.textContent='Không tải được bộ lọc công ty/thiết bị. Hãy tải lại trang và kiểm tra quyền báo cáo.';});
+    }).catch(()=>{info.hidden = selected !== null; info.textContent='Không tải được bộ lọc công ty/thiết bị. Hãy tải lại trang và kiểm tra quyền báo cáo.';});
     overview();
   }
   window.RfidDeskReport={mount};
