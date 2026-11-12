@@ -4,7 +4,7 @@
   const store = window.RfidOffline;
   const $ = id => document.getElementById(id);
   const state = { device: null, session: null, renderedSessionId: null, stream: null, cameraTimer: null, returnView: null,
-    scanPaused: false, refreshing: false, activeSessionTab: 'po', activeBoxFilter: 'not-scanned', boxSearch: '', sessionRows: null, completing: false, completionPending: false, completionProgress: null };
+    homeTab: 'active', bookingIds: [], scanPaused: false, refreshing: false, activeSessionTab: 'po', activeBoxFilter: 'not-scanned', boxSearch: '', sessionRows: null, completing: false, completionPending: false, completionProgress: null };
   const SCAN_COMMIT_DELAY_MS = 60;
   let scannerCommitTimer = null;
   let lastFocusedRfidKeyAt = 0;
@@ -84,9 +84,10 @@
     $('device-company-label').textContent = state.device?.companyName || i18n.text('ui.not_available');
   };
   const views = name => {
+    $('rfid-app').dataset.view = name;
     for (const id of ['device-view', 'home-view', 'session-view']) show(id, id === name);
     show('back-home', name === 'session-view');
-    $('screen-title').textContent = i18n.text(name === 'session-view' ? 'ui.scan_session' : 'ui.title');
+    $('screen-title').textContent = i18n.text(name === 'session-view' ? 'ui.scan_session' : name === 'device-view' ? 'ui.device_info' : 'ui.title');
     show('session-booking', name === 'session-view');
   };
   const table = (target, columns, rows, emptyKey = 'ui.empty_rows', tableClass = 'table table-bordered') => {
@@ -410,7 +411,7 @@
   };
   const saveSession = async session => { state.session = session; await store.put('sessions', session); await store.put('meta', session.sessionId, 'currentSession'); await renderSession(); };
   const openSession = async sessionId => {
-    resetSessionNavigation();
+    resetSessionNavigation(); clearNotice();
     try { await saveSession(await api('session', { sessionId })); return true; }
     catch (error) {
       if (!navigator.onLine) {
@@ -433,26 +434,45 @@
     const parent = $(target); parent.replaceChildren();
     if (!rows.length) { const p = document.createElement('p'); p.className = 'text-muted'; p.textContent = i18n.text(emptyKey); parent.append(p); return; }
     for (const row of rows) {
-      const card = document.createElement('div'); card.className = 'border rounded p-2 mb-2';
+      const card = document.createElement('article'); card.className = `rfid-session-card ${active ? 'is-active' : 'is-completed'}`;
       const title = document.createElement('div'); title.textContent = (row.bookingIds || []).join(', ') || row.sessionId;
-      const meta = document.createElement('small'); meta.className = 'text-muted d-block';
-      meta.textContent = [row.vehiclePlateNumber, i18n.text('ui.scan_count', { count: active ? (scanCounts.get(row.sessionId) ?? row.totalScannedCount ?? 0) : (row.totalScannedCount || 0) })].filter(Boolean).join(' · ');
-      const actions = document.createElement('div'); actions.className = 'd-flex flex-wrap align-items-center';
-      const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'btn btn-default btn-sm mr-2 mt-2'; openButton.textContent = i18n.text('ui.resume'); openButton.onclick = () => openSession(row.sessionId);
+      title.className = 'rfid-session-card-title';
+      const top = node('div', 'rfid-card-top');
+      top.append(node('span', 'rfid-status-pill', i18n.text(active ? 'ui.scanning_status' : 'ui.completed_status')));
+      const timestamp = row.sessionCompletedAtUtc || row.sessionStartedAtUtc;
+      const date = timestamp ? new Date(timestamp) : null;
+      if (date && !Number.isNaN(date.getTime())) {
+        const time = node('time', 'text-muted', date.toLocaleString(i18n.language === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }));
+        time.dateTime = date.toISOString(); top.append(time);
+      }
+      const meta = node('div', 'rfid-card-meta text-muted');
+      meta.append(node('div', '', `${i18n.text('ui.driver')}: ${row.driverFullName || '—'}`),
+        node('div', '', i18n.text('ui.item_po', { po: (row.orderNos || []).join(', ') || '—' })));
+      if (row.vehiclePlateNumber) meta.append(node('div', '', `${i18n.text('ui.vehicle')}: ${row.vehiclePlateNumber}`));
+      const metrics = node('div', 'rfid-card-metrics');
+      const count = active ? (scanCounts.get(row.sessionId) ?? row.totalScannedCount ?? 0) : (row.totalScannedCount || 0);
+      const metricValues = active
+        ? [['ui.metric_scanned', formatCount(count)], ['ui.total_items', formatCount(row.plannedItemCount)], ['ui.planned_boxes', formatCount(row.plannedBoxCount)]]
+        : [['ui.metric_scanned', `${formatCount(count)}/${formatCount(row.plannedItemCount)}`], ['ui.metal_checked', formatCount(row.metalCheckedCount)], ['ui.scanned_boxes', `${formatCount(row.boxScannedCount)}/${formatCount(row.plannedBoxCount)}`]];
+      for (const [label, number] of metricValues) {
+        const metric = node('div'); metric.append(node('small', 'text-muted', i18n.text(label)), node('strong', '', number)); metrics.append(metric);
+      }
+      const actions = node('div', 'rfid-card-actions');
+      const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'btn btn-default btn-sm mr-2 mt-2'; openButton.textContent = i18n.text(active ? 'ui.continue' : 'ui.view_details'); openButton.onclick = () => openSession(row.sessionId);
       actions.append(openButton);
       if (active) {
-        const completeButton = document.createElement('button'); completeButton.type = 'button'; completeButton.className = 'btn btn-primary btn-sm mr-2 mt-2'; completeButton.textContent = i18n.text('ui.complete');
+        const completeButton = document.createElement('button'); completeButton.type = 'button'; completeButton.className = 'btn btn-primary btn-sm mr-2 mt-2'; completeButton.textContent = i18n.text('ui.complete_short');
         completeButton.onclick = async () => { completeButton.disabled = true; try { if (await openSession(row.sessionId)) await beginCompletion(); } finally { completeButton.disabled = false; } };
         const deleteButton = document.createElement('button'); deleteButton.type = 'button'; deleteButton.className = 'btn btn-danger btn-sm mt-2'; deleteButton.textContent = i18n.text('ui.delete');
         deleteButton.onclick = async () => { deleteButton.disabled = true; try { await deleteSession(row.sessionId); } finally { deleteButton.disabled = false; } };
         actions.append(completeButton, deleteButton);
       }
-      card.append(title, meta, actions); parent.append(card);
+      card.append(top, title, meta, metrics, actions); parent.append(card);
     }
   };
   const loadHome = async () => {
     if (!state.device) return views('device-view');
-    views('home-view');
+    views('home-view'); selectHomeTab(state.homeTab);
     $('device-summary').textContent = `${state.device.deviceName} · ${state.device.companyName}`;
     try {
       const [active, history, scanCounts] = await Promise.all([api('active'), api('history'), localScanCounts()]);
@@ -480,7 +500,8 @@
     } catch (error) { explain(error); }
   };
   const start = async () => {
-    const bookingIds = value('booking-ids').split(/[\n,;]+/).map(x => x.trim()).filter(Boolean);
+    addBooking();
+    const bookingIds = [...state.bookingIds];
     if (!bookingIds.length) return notice('error.bookings_required', 'danger');
     const button = $('start-session');
     if (button.disabled) return;
@@ -494,6 +515,7 @@
       const session = result?.session;
       if (!session?.sessionId) throw { code: 'error.unexpected' };
       resetScannerBuffer(); resetSessionNavigation();
+      state.bookingIds = []; renderBookings();
       state.session = session;
       views('session-view');
       let cacheReady = true;
@@ -534,7 +556,7 @@
     } catch { notice('error.offline_storage', 'danger'); }
   };
   const canCaptureScans = () => state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending && !state.scanPaused && !state.refreshing
-    && !$('session-view').hidden && !$('scan-dock').hidden && $('item-detail-modal').hidden;
+    && !$('device-info-modal').open && !$('session-view').hidden && !$('scan-dock').hidden && $('item-detail-modal').hidden;
   const enqueueScan = (rfid, focusAfter = false, sessionId = state.session?.sessionId) => {
     if (!sessionId) return Promise.resolve();
     scanQueue = scanQueue.catch(() => {}).then(() => addScan(rfid, sessionId, focusAfter));
@@ -730,7 +752,7 @@
     if (state.cameraTimer) clearInterval(state.cameraTimer);
     state.cameraTimer = null;
     if (state.stream) state.stream.getTracks().forEach(track => track.stop());
-    state.stream = null; $('qr-video').srcObject = null;
+    state.stream = null; $('qr-video').srcObject = null; show('camera-preview', false);
     $('camera-status').textContent = i18n.text('ui.camera_idle');
   };
   const parseDeviceId = raw => {
@@ -743,6 +765,7 @@
     try {
       const detector = new BarcodeDetector({ formats: ['qr_code'] });
       state.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      show('camera-preview', true);
       const video = $('qr-video'); video.srcObject = state.stream; await video.play();
       $('camera-status').textContent = i18n.text('ui.camera_scanning');
       state.cameraTimer = setInterval(async () => {
@@ -751,6 +774,33 @@
         catch { /* Keep the camera open for the next frame. */ }
       }, 500);
     } catch { stopCamera(); notice('error.camera_failed', 'danger'); }
+  };
+  const selectHomeTab = (name, focus = false) => {
+    state.homeTab = name;
+    for (const tab of ['active', 'history']) {
+      const selected = tab === name;
+      const button = $(`home-tab-${tab}`);
+      button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1;
+      show(`home-${tab}-panel`, selected);
+      if (selected && focus) button.focus();
+    }
+  };
+  const renderBookings = () => {
+    const list = $('booking-chips'); list.replaceChildren();
+    $('booking-ids').value = state.bookingIds.join('\n');
+    if (!state.bookingIds.length) list.append(node('p', 'rfid-empty', i18n.text('ui.empty_bookings')));
+    for (const booking of state.bookingIds) {
+      const chip = node('div', 'rfid-booking-chip');
+      const remove = node('button', '', '×'); remove.type = 'button';
+      remove.setAttribute('aria-label', i18n.text('ui.remove_booking', { booking }));
+      remove.onclick = () => { state.bookingIds = state.bookingIds.filter(id => id !== booking); renderBookings(); $('booking-entry').focus(); };
+      chip.append(node('span', '', booking), remove); list.append(chip);
+    }
+  };
+  const addBooking = () => {
+    const entered = value('booking-entry').split(/[\n,;\s]+/).map(normalized).filter(Boolean);
+    state.bookingIds = [...new Set([...state.bookingIds, ...entered])];
+    $('booking-entry').value = ''; renderBookings();
   };
   const renderScanMode = () => {
     $('toggle-scan').textContent = i18n.text(state.scanPaused ? 'ui.resume_scan' : 'ui.pause_scan');
@@ -786,6 +836,14 @@
     $('device-settings').onclick = () => {
       resetScannerBuffer();
       if (!state.device) { views('device-view'); $('device-id').focus(); return; }
+      $('info-device-id').textContent = state.device.id;
+      $('info-device-name').textContent = state.device.deviceName || i18n.text('ui.not_available');
+      $('info-company').textContent = state.device.companyName || i18n.text('ui.not_available');
+      $('device-info-modal').showModal();
+    };
+    $('close-device-info').onclick = () => $('device-info-modal').close();
+    $('manage-device').onclick = () => {
+      $('device-info-modal').close();
       if (!state.returnView) state.returnView = $('session-view').hidden ? 'home-view' : 'session-view';
       $('device-id').value = state.device.id;
       renderDeviceInfo(); clearNotice(); views('device-view');
@@ -797,8 +855,15 @@
       if (returnView === 'session-view' && state.session) await renderSession();
       else await loadHome();
     };
-    $('change-device').onclick = async () => { resetScannerBuffer(); stopCamera(); state.returnView = null; state.device = null; state.session = null; resetSessionNavigation(); renderDeviceInfo(); $('device-id').value = ''; await store.remove('meta', 'device'); await store.remove('meta', 'currentSession'); clearNotice(); views('device-view'); };
+    $('change-device').onclick = async () => { if (!window.confirm(i18n.text('ui.confirm_change_device'))) return; $('device-info-modal').close(); resetScannerBuffer(); stopCamera(); state.returnView = null; state.device = null; state.session = null; resetSessionNavigation(); renderDeviceInfo(); $('device-id').value = ''; await store.remove('meta', 'device'); await store.remove('meta', 'currentSession'); clearNotice(); views('device-view'); };
     $('start-session').onclick = start;
+    $('add-booking').onclick = addBooking;
+    $('booking-entry').onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); addBooking(); } };
+    for (const button of document.querySelectorAll('[data-home-tab]')) {
+      button.onclick = () => selectHomeTab(button.dataset.homeTab);
+      button.onkeydown = event => navigateTabsWithKeyboard(event, ['active', 'history'], state.homeTab, selectHomeTab);
+    }
+    renderBookings();
     $('refresh-active').onclick = loadHome; $('refresh-history').onclick = loadHome;
     $('back-home').onclick = async () => { resetScannerBuffer(); state.session = null; resetSessionNavigation(); await store.remove('meta', 'currentSession'); await loadHome(); };
     $('completed-home').onclick = () => $('back-home').click();

@@ -77,3 +77,5 @@ node --check finished_good_pack_rfid_scan/public/rfid/client.js
 Chưa thể kiểm thử SOAP thực, Pilot migration, HTTPS/camera và luồng tablet trên site Frappe trong repo cục bộ. Trước khi vận hành, chạy thử trên site pilot với tài khoản SOAP và thiết bị thử nghiệm của từng Company.
 
 Bản `0.1.22` cập nhật giao diện theo RFID Scan: khung 480px, thẻ thống kê gradient, danh sách PO dạng thẻ, giao diện sáng/tối, thanh quét cố định với tạm dừng/tiếp tục, Trang chủ, Làm mới booking và Hoàn thành. Giữ ba tab hiện tại. Patch cập nhật Web Page khi migrate; service worker v17 nạp CSS và client mới.
+
+Bản `0.1.23` đồng bộ trang tạo phiên, lịch sử, kích hoạt và thông tin thiết bị với giao diện RFID mẫu. Trang chủ có tab Phiên quét/Lịch sử, booking dạng danh sách, thẻ phiên có trạng thái và chỉ số, hộp thoại thiết bị hỗ trợ bàn phím. Chỉ số Thùng đã scan trên lịch sử là số thùng đã có RFID, không phải số thùng quét đủ. Patch cập nhật Web Page khi migrate; service worker v18.
