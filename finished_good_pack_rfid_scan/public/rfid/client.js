@@ -265,7 +265,6 @@
     }
     views('session-view');
     $('session-booking').textContent = `Booking: ${(s.preloadedBookings || []).map(b => b.displayBookingId || b.bookingId).join(', ')}`;
-    show('completed-home', s.sessionStatus === 'Completed');
     let local = [];
     let storageReady = true;
     if (s.sessionStatus !== 'Completed') {
@@ -282,18 +281,17 @@
     const editable = s.sessionStatus === 'Active';
     if (!editable) state.completing = false;
     lockCompletionNavigation(state.refreshing || (editable && state.completing));
-    show('scan-dock', editable && !state.completing);
-    show('scan-dock-spacer', editable && !state.completing);
+    show('scan-dock', !state.completing);
+    show('scan-controls', editable);
+    $('refresh-session').disabled = !editable || state.refreshing;
+    $('complete-session').disabled = !editable || state.refreshing;
+    show('scan-dock-spacer', !state.completing);
     show('completion-form', editable && state.completing);
     if (s.sessionStatus === 'Completed') {
       const total = Number(s.totalScannedCount ?? scans.length);
       state.completionProgress = { phase: 'complete', uploaded: total, total };
     }
     renderCompletionProgress();
-    show('completed-details', s.sessionStatus === 'Completed');
-    $('completed-vehicle').textContent = s.vehiclePlateNumber || i18n.text('ui.not_available');
-    $('completed-driver').textContent = s.driverFullName || i18n.text('ui.not_available');
-    $('completed-note').textContent = s.note || i18n.text('ui.not_available');
     const warnings = s.planningWarnings || [];
     show('session-warnings', warnings.length > 0); $('session-warnings').replaceChildren(...warnings.map(w => { const p = document.createElement('p'); p.textContent = w; return p; }));
     const scannedIds = new Set(scans.map(x => `${x.bookingId}|${x.finishedGoodPackDetailId}`));
@@ -866,7 +864,6 @@
     renderBookings();
     $('refresh-active').onclick = loadHome; $('refresh-history').onclick = loadHome;
     $('back-home').onclick = async () => { resetScannerBuffer(); state.session = null; resetSessionNavigation(); await store.remove('meta', 'currentSession'); await loadHome(); };
-    $('completed-home').onclick = () => $('back-home').click();
     $('toggle-scan').onclick = () => {
       resetScannerBuffer(); state.scanPaused = !state.scanPaused; renderScanMode();
       if (!state.scanPaused) $('rfid-input').focus();
