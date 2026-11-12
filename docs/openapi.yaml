@@ -28,6 +28,10 @@ paths:
           name: status
           schema: { type: string, enum: [Active, Completed] }
         - in: query
+          name: before
+          description: Photo cursor returned by photos.nextCursor.
+          schema: { type: string }
+        - in: query
           name: pageIndex
           schema: { type: integer, minimum: 1 }
         - in: query
@@ -179,6 +183,7 @@ components:
       properties:
         deviceId: { type: string, description: Approved Frappe Factory Device ID }
         sessionId: { type: string, format: uuid }
+        photoId: { type: string, description: Photo ID for delete_photo }
         bookingId: { type: string }
         bookingIds:
           type: array
