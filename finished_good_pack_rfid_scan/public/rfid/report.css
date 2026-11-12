@@ -1,3 +1,4 @@
+.rfid-report [hidden] {display:none !important}
 .rfid-report {padding:20px; color:var(--text-color,#243449)}
 .rfid-report-filters {display:grid; grid-template-columns:repeat(4,minmax(150px,1fr));gap:14px;align-items:end;margin-bottom:16px}
 .rfid-report-filters label {display:flex;flex-direction:column;gap:6px;margin:0;font-weight:500}
