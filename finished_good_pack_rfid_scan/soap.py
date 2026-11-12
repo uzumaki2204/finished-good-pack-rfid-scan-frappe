@@ -363,7 +363,8 @@ def refresh_booking(company, booking_id, full=False, previous=None):
         signature = snapshot_version({"pack": pack, "sources": relevant})
         old = old_packs.get(pack_id, {})
         rows = old.get("details", [])
-        expected = max((int(row.get("quantity") or 0) for row in relevant), default=0)
+        # Source quantity is not the RFID count per carton (confirmed against ERP).
+        expected = int(pack.get("qtyPerSet") or 0)
         incomplete = not rows or any(not text(row.get("rfid")) for row in rows) or (expected > 0 and len(rows) < expected)
         if full or signature != old.get("signature") or incomplete:
             if soap_user is None:

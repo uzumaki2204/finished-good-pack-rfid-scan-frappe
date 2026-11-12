@@ -58,6 +58,14 @@ class SourceRefreshTests(unittest.TestCase):
         self.assertFalse(second["fullCheck"])
         self.read.assert_not_called()
 
+    def test_booking_source_quantity_is_not_per_carton_rfid_count(self):
+        self.sources[0]["quantity"] = 177
+        self.pack["qtyPerSet"] = 1
+        soap.refresh_booking("C", "B")
+        self.read.reset_mock()
+        soap.refresh_booking("C", "B")
+        self.read.assert_not_called()
+
     def test_only_changed_pack_is_read(self):
         soap.refresh_booking("C", "B")
         self.read.reset_mock()
