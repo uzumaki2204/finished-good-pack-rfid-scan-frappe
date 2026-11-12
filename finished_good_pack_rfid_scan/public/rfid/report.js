@@ -26,6 +26,8 @@
   };
   const printButton = action => iconButton('In','M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6zM18 12h.01',action);
   const refreshButton = action => iconButton('Làm mới','M20 7v5h-5M4 17v-5h5M6.1 6.1A8 8 0 0 1 19.7 10M4.3 14A8 8 0 0 0 17.9 17.9',action);
+  const viewButton = action => iconButton('Xem phiên','M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',action);
+  const backButton = action => iconButton('Tổng quan','M19 12H5m6-6-6 6 6 6',action);
   const call = async (method, args = {}) => {
     const response = await frappe.call({method: API + method, args, type: 'GET'});
     if (!response || response.exc || response.message === undefined) throw new Error('Không thể tải báo cáo. Vui lòng thử lại.');
@@ -55,7 +57,7 @@
     const body = node('tbody');
     rows.forEach(row => {
       const tr = node('tr');
-      if (onOpen) {const td = node('td'); td.append(button('Xem phiên', () => onOpen(row.sessionId))); tr.append(td);}
+      if (onOpen) {const td = node('td'); td.append(viewButton(() => onOpen(row.sessionId))); tr.append(td);}
       columns.forEach(([key,, format]) => tr.append(node('td', text(format ? format(row[key]) : row[key]))));
       body.append(tr);
     });
@@ -112,7 +114,7 @@
       content.replaceChildren(node('p','Đang tải chi tiết…'));
       try {
         const data = await call('detail',{session_id:id,page:pageIndex}); if(seq !== request) return;
-        const header = node('div',undefined,'rfid-report-actions'); header.append(button('← Tổng quan',()=>overview(overviewPage)),refreshButton(()=>open(id,pageIndex)),printButton(()=>printReport({session_id:id})));
+        const header = node('div',undefined,'rfid-report-actions'); header.append(backButton(()=>overview(overviewPage)),refreshButton(()=>open(id,pageIndex)),printButton(()=>printReport({session_id:id})));
         const title = node('h3',`Chi tiết phiên · ${data.session.bookingIds.join(', ')}`);
         const summary = node('dl',undefined,'rfid-report-summary');
         overviewColumns.forEach(([key,label,format])=>{summary.append(node('dt',label),node('dd',text(format?format(data.session[key]):data.session[key])));});
@@ -123,7 +125,7 @@
         if(data.session.status === 'Active') content.append(node('p',pending + '. Các lượt quét được gửi lên máy chủ khi hoàn thành phiên.','alert alert-info'));
         content.append(node('h4','Chi tiết RFID'),table(detailColumns,data.items),pager(data,p=>open(id,p)),photosSection);
         gallery(id,seq,grid,photoStatus);
-      } catch {if(seq===request) {error(content,()=>open(id,pageIndex));content.prepend(button('← Tổng quan',()=>overview(overviewPage)));}}
+      } catch {if(seq===request) {error(content,()=>open(id,pageIndex));content.prepend(backButton(()=>overview(overviewPage)));}}
     }
     const imageUrl = (id,photo,thumbnail=false) => '/api/method/'+API+'photo_content?'+new URLSearchParams({session_id:id,photo_id:photo,thumbnail:thumbnail?'1':'0'});
     function viewer(id,photo) {
