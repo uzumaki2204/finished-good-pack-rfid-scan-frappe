@@ -377,7 +377,7 @@ def refresh_optimized(device_id, session_id, booking_id, mode="light", client_ve
         _update_counts(session, current)
     result = {"bookingId": booking["bookingId"], "baseVersion": client_version,
               "planVersion": version, "hasChanges": changed, **check}
-    if client_version != old.get("planVersion"):
+    if client_version not in (old.get("planVersion"), old_version):
         result["booking"] = booking
     elif changed:
         before = {i["finishedGoodPackDetailId"]: i for i in old.get("items", [])}

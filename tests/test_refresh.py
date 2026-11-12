@@ -129,6 +129,13 @@ class OptimizedServiceTests(unittest.TestCase):
         self.mocks[5].assert_not_called(); self.mocks[6].assert_not_called()
         self.assertLess(len(json.dumps(result)), 400)
 
+    def test_legacy_snapshot_accepts_canonical_client_version(self):
+        canonical_version = snapshot_version(self.old)
+        self.old["planVersion"] = "legacy-order-sensitive-hash"
+        result = self.run_refresh(canonical_version)
+        self.assertNotIn("booking", result)
+        self.assertNotIn("patch", result)
+
     def test_version_mismatch_returns_only_booking(self):
         result = self.run_refresh("offline-version")
         self.assertIn("booking", result); self.assertNotIn("session", result)
