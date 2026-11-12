@@ -810,20 +810,22 @@
     $('toggle-scan').setAttribute('aria-pressed', String(state.scanPaused));
     $('rfid-input').disabled = state.scanPaused || state.refreshing;
   };
-  const refreshSession = async () => {
-    if (state.refreshing || state.session?.sessionStatus !== 'Active') return;
+  const hasCartonMismatch = booking => Number(booking.headerPlannedCartonCount || 0) > 0
+    && Number(booking.headerActualCartonCount || 0) !== Number(booking.headerPlannedCartonCount);
+  const refreshSession = async ({ automatic = false } = {}) => {
+    if (state.completing || state.completionPending || state.refreshing || state.session?.sessionStatus !== 'Active') return;
     if (!navigator.onLine) return notice('ui.network_required', 'warning');
     state.refreshing = true; resetScannerBuffer(); renderScanMode();
     const controls = ['back-home', 'device-settings', 'refresh-session', 'complete-session', 'toggle-scan'];
     controls.forEach(id => { $(id).disabled = true; });
     try {
       await scanQueue;
-      for (const booking of [...(state.session.preloadedBookings || [])]) {
+      for (const booking of [...(state.session.preloadedBookings || [])].filter(b => !automatic || hasCartonMismatch(b))) {
         const result = await api('refresh_delta', { sessionId: state.session.sessionId, bookingId: booking.bookingId }, 'POST');
         await saveSession(result.session);
       }
-      notice('success.booking_refreshed', 'success');
-    } catch (error) { explain(error); }
+      if (!automatic) notice('success.booking_refreshed', 'success');
+    } catch (error) { if (!automatic) explain(error); }
     finally {
       state.refreshing = false; controls.forEach(id => { $(id).disabled = false; }); renderScanMode();
     }
@@ -833,6 +835,15 @@
     i18n.render(); renderNetwork();
     window.RfidPhotos.init({ api, context: () => ({ deviceId: state.device?.id, sessionId: state.session?.sessionId }) });
     window.addEventListener('online', renderNetwork); window.addEventListener('offline', renderNetwork);
+    window.setInterval(() => {
+      if (!navigator.onLine || document.hidden || $('session-view').hidden
+          || state.session?.sessionStatus !== 'Active' || state.refreshing
+          || state.completing || state.completionPending || $('rfid-input').value
+          || $('photo-dialog').open || $('device-info-modal').open || !$('item-detail-modal').hidden) return;
+      if ((state.session.preloadedBookings || []).some(hasCartonMismatch)) {
+        void refreshSession({ automatic: true });
+      }
+    }, 60000);
     $('activate-device').onclick = () => activate(value('device-id'));
     $('check-device').onclick = () => activate(value('device-id'));
     $('device-id').onkeydown = event => { if (event.key === 'Enter') activate(value('device-id')); };
