@@ -297,6 +297,12 @@
     const warnings = (s.planningWarnings || []).map(warning => String(warning)
       .replace(/^Booking (.+): (\d+)\/(\d+) (?:cartons|thùng)\.$/, 'Booking $1: Số thùng thực tế ($2) khác số thùng kế hoạch ($3).')
       .replace(/^(\d+) cartons are not mapped to RFID\.$/, 'Còn $1 thùng chưa được liên kết RFID.'));
+    const planLookup = new Map((s.preloadedBookings || []).flatMap(b => (b.items || []).map(i => [`${b.bookingId}|${i.finishedGoodPackDetailId}`, i])));
+    const noLongerValid = scans.filter(scan => {
+      const item = planLookup.get(`${scan.bookingId}|${scan.finishedGoodPackDetailId}`);
+      return !item || normalizedRfid(item.rfid) !== normalizedRfid(scan.rfid);
+    }).length;
+    if (s.sessionStatus === 'Active' && noLongerValid) warnings.push(`Có ${noLongerValid} lượt quét không còn khớp kế hoạch mới. Dữ liệu quét vẫn được giữ; vui lòng kiểm tra trước khi hoàn thành.`);
     show('session-warnings', warnings.length > 0); $('session-warnings').replaceChildren(...warnings.map(w => { const p = document.createElement('p'); p.textContent = w; return p; }));
     const scannedIds = new Set(scans.map(x => `${x.bookingId}|${x.finishedGoodPackDetailId}`));
     const po = new Map(), items = new Map(), boxes = new Map(), poBoxKeys = new Map(), poPendingBoxes = new Map();
@@ -813,21 +819,63 @@
   const hasCartonMismatch = booking => Number(booking.headerPlannedCartonCount || 0) > 0
     && Number(booking.headerActualCartonCount || 0) !== Number(booking.headerPlannedCartonCount);
   const refreshSession = async ({ automatic = false } = {}) => {
-    if (state.completing || state.completionPending || state.refreshing || state.session?.sessionStatus !== 'Active') return;
-    if (!navigator.onLine) return notice('ui.network_required', 'warning');
-    state.refreshing = true; resetScannerBuffer(); renderScanMode();
-    const controls = ['back-home', 'device-settings', 'refresh-session', 'complete-session', 'toggle-scan'];
-    controls.forEach(id => { $(id).disabled = true; });
+    if (state.completing || state.completionPending || state.refreshing || state.refreshRequest || state.session?.sessionStatus !== 'Active') return;
+    if (!navigator.onLine) return automatic ? undefined : notice('ui.network_required', 'warning');
+    const sessionId = state.session.sessionId;
+    const deviceId = state.device?.id;
+    const stillCurrent = () => state.session?.sessionId === sessionId && state.device?.id === deviceId
+      && state.session.sessionStatus === 'Active' && !state.completing && !state.completionPending;
+    state.refreshRequest = true;
+    $('refresh-session').disabled = true;
     try {
-      await scanQueue;
       for (const booking of [...(state.session.preloadedBookings || [])].filter(b => !automatic || hasCartonMismatch(b))) {
-        const result = await api('refresh_delta', { sessionId: state.session.sessionId, bookingId: booking.bookingId }, 'POST');
-        await saveSession(result.session);
+        if (!stillCurrent()) break;
+        const result = await api('refresh_optimized', { sessionId, bookingId: booking.bookingId,
+          planVersion: booking.planVersion, mode: automatic ? 'light' : 'full' }, 'POST');
+        if (!stillCurrent() || result.stale) continue;
+        if (!result.booking && !result.patch) continue;
+        // Do not interrupt a partially typed RFID, a modal, or a background page.
+        // The next check receives a full snapshot if this response was not applied.
+        if (document.hidden || $('session-view').hidden || $('rfid-input').value
+            || $('photo-dialog').open || $('device-info-modal').open || !$('item-detail-modal').hidden) continue;
+        state.refreshing = true; renderScanMode(); lockCompletionNavigation(true);
+        try {
+          await scanQueue;
+          if (!stillCurrent()) continue;
+          const current = state.session.preloadedBookings.find(b => b.bookingId === booking.bookingId);
+          if (!current || current.planVersion !== result.baseVersion) continue;
+          let updated = result.booking;
+          if (!updated) {
+            const items = new Map((current.items || []).map(i => [i.finishedGoodPackDetailId, i]));
+            result.patch.remove.forEach(id => items.delete(id));
+            result.patch.upsert.forEach(item => items.set(item.finishedGoodPackDetailId, item));
+            updated = { ...result.patch.metadata, items: [...items.values()] };
+          }
+          const next = { ...state.session,
+            preloadedBookings: state.session.preloadedBookings.map(b => b.bookingId === updated.bookingId ? updated : b) };
+          next.plannedItemCount = new Set(next.preloadedBookings.flatMap(b => (b.items || []).map(i => i.finishedGoodPackDetailId))).size;
+          next.plannedBoxCount = next.preloadedBookings.reduce((n,b) => n + Number(b.plannedBoxCount || 0), 0);
+          next.planningWarnings = next.preloadedBookings.flatMap(b => b.planningWarnings || []);
+          const x = window.scrollX, y = window.scrollY;
+          const focus = document.activeElement;
+          // Plan and version are committed in a single IndexedDB record/transaction.
+          await store.put('sessions', next);
+          if (!stillCurrent()) continue;
+          state.session = next;
+          await renderSession();
+          window.scrollTo(x,y);
+          if (focus?.isConnected) focus.focus({preventScroll:true});
+        } finally {
+          state.refreshing = false; renderScanMode();
+          lockCompletionNavigation(state.completing || state.completionPending);
+        }
       }
-      if (!automatic) notice('success.booking_refreshed', 'success');
-    } catch (error) { if (!automatic) explain(error); }
-    finally {
-      state.refreshing = false; controls.forEach(id => { $(id).disabled = false; }); renderScanMode();
+      if (!automatic && stillCurrent()) notice('success.booking_refreshed', 'success');
+    } catch (error) {
+      if (!automatic) explain(error);
+    } finally {
+      state.refreshRequest = false;
+      $('refresh-session').disabled = state.session?.sessionStatus !== 'Active' || state.completing || state.completionPending;
     }
   };
   const init = async () => {
@@ -837,7 +885,7 @@
     window.addEventListener('online', renderNetwork); window.addEventListener('offline', renderNetwork);
     window.setInterval(() => {
       if (!navigator.onLine || document.hidden || $('session-view').hidden
-          || state.session?.sessionStatus !== 'Active' || state.refreshing
+          || state.session?.sessionStatus !== 'Active' || state.refreshing || state.refreshRequest
           || state.completing || state.completionPending || $('rfid-input').value
           || $('photo-dialog').open || $('device-info-modal').open || !$('item-detail-modal').hidden) return;
       if ((state.session.preloadedBookings || []).some(hasCartonMismatch)) {

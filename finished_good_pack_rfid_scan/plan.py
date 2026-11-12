@@ -33,9 +33,18 @@ def stable_uuid(*parts):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, "\x1f".join(map(text, parts))))
 
 
+def canonical(value):
+    """Order-independent semantic content, excluding refresh/localization metadata."""
+    if isinstance(value, dict):
+        return {k: canonical(v) for k, v in sorted(value.items()) if k not in
+                ("planVersion", "downloadedAtUtc", "expiresAtUtc", "planningWarnings")}
+    if isinstance(value, list):
+        return sorted((canonical(v) for v in value), key=lambda v: json.dumps(v, sort_keys=True, ensure_ascii=False))
+    return value
+
+
 def snapshot_version(payload):
-    basis = {k: v for k, v in payload.items() if k not in ("planVersion", "downloadedAtUtc", "expiresAtUtc")}
-    return hashlib.sha256(json.dumps(basis, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+    return hashlib.sha256(json.dumps(canonical(payload), ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def _physical_key(row):
@@ -237,8 +246,8 @@ def booking_delta(old, new):
     added = added_items or added_boxes
     removed = removed_items or removed_boxes
     return {
-        "hasChanges": bool(added or removed),
-        "deltaStatus": "Mixed" if added and removed else "Expanded" if added else "Reduced" if removed else "Unchanged",
+        "hasChanges": snapshot_version(old or {}) != snapshot_version(new),
+        "deltaStatus": "Mixed" if added and removed else "Expanded" if added else "Reduced" if removed else "Modified" if snapshot_version(old or {}) != snapshot_version(new) else "Unchanged",
         "addedItemCount": added_items,
         "removedItemCount": removed_items,
         "addedBoxCount": added_boxes,

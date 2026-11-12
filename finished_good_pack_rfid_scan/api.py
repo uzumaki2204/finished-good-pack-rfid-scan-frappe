@@ -22,6 +22,7 @@ WRITE = {
     "start": lambda d: service.start_session(_device(d), d.get("bookingIds"), d.get("vehiclePlateNumber"),
                                              d.get("driverFullName"), d.get("confirmConflicts") is True),
     "preload": lambda d: service.preload(_device(d), d.get("bookingId"), d.get("sessionId")),
+    "refresh_optimized": lambda d: service.refresh_optimized(_device(d), d.get("sessionId"), d.get("bookingId"), d.get("mode", "light"), d.get("planVersion")),
     "refresh_delta": lambda d: service.refresh_delta(_device(d), d.get("sessionId"), d.get("bookingId")),
     "rehydrate": lambda d: service.rehydrate(_device(d), d.get("sessionId")),
     "complete": lambda d: service.complete(_device(d), d.get("sessionId"), d.get("vehiclePlateNumber"),

@@ -1,6 +1,7 @@
 """Read-only SOAP booking source used by the RFID tablet."""
 
 import re
+import time
 from collections import defaultdict
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse
@@ -10,7 +11,7 @@ import frappe
 import requests
 
 from finished_good_pack_rfid_scan.errors import RfidError
-from finished_good_pack_rfid_scan.plan import key, resolve_booking, text
+from finished_good_pack_rfid_scan.plan import key, resolve_booking, text, snapshot_version
 
 
 SOAP = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -289,7 +290,7 @@ def _market(code):
     return frappe.db.get_value("Market", {"code": code, "is_active": 1}, ["name", "name_en"], as_dict=True)
 
 
-def preload_booking(company, booking_id):
+def _booking_sources(company, booking_id):
     """Only SOAP reads and Frappe master lookups; no SQL Server connection."""
     normalized_id = text(booking_id)
     if not normalized_id:
@@ -336,9 +337,42 @@ def preload_booking(company, booking_id):
             page_number += 1
             if page_number > 1000:
                 raise RfidError("error.soap_response", 502)
-    details = {}
-    if packs_by_id:
-        soap_user = _login(account, password)
-        for pack in packs_by_id.values():
-            details[pack["innerPackNum"]] = _pack_details(account, soap_user, pack)
-    return resolve_booking(company, booking, sources, list(packs_by_id.values()), details, _market)
+    return account, password, booking, sources, packs_by_id
+
+
+def preload_booking(company, booking_id):
+    return refresh_booking(company, booking_id, full=True)[0]
+
+
+def refresh_booking(company, booking_id, full=False, previous=None):
+    """Server-only Redis cache; expiry safely falls back to a complete read."""
+    account, password, booking, sources, packs = _booking_sources(company, booking_id)
+    cache_key = "rfid:refresh:v1:" + snapshot_version({"company": company, "booking": booking["innerBookingId"]})
+    cached = frappe.cache.get_value(cache_key) or {}
+    now = time.time()
+    was_mismatch = previous and previous.get("headerPlannedCartonCount", 0) > 0 and previous.get("headerPlannedCartonCount") != previous.get("headerActualCartonCount")
+    now_matches = booking.get("conPreShipPackCnt", 0) > 0 and booking.get("conPreShipPackCnt") == booking.get("conActShipPackCnt")
+    full = bool(full or not cached or now - cached.get("full_at", 0) >= 600 or (was_mismatch and now_matches))
+    old_packs = cached.get("packs", {})
+    entries, details = {}, {}
+    soap_user = None
+    calls = 0
+    for pack_id, pack in sorted(packs.items()):
+        relevant = [row for row in sources if (key(row.get("orderNo")), key(row.get("doNo")), key(row.get("usedPackNum"))) ==
+                    (key(pack.get("orderNo")), key(pack.get("doNo")), key(pack.get("dispPackNum")))]
+        signature = snapshot_version({"pack": pack, "sources": relevant})
+        old = old_packs.get(pack_id, {})
+        rows = old.get("details", [])
+        expected = max((int(row.get("quantity") or 0) for row in relevant), default=0)
+        incomplete = not rows or any(not text(row.get("rfid")) for row in rows) or (expected > 0 and len(rows) < expected)
+        if full or signature != old.get("signature") or incomplete:
+            if soap_user is None:
+                soap_user = _login(account, password)
+            rows = _pack_details(account, soap_user, pack)
+            calls += 1
+        details[pack_id] = rows
+        entries[pack_id] = {"signature": signature, "details": rows}
+    result = resolve_booking(company, booking, sources, list(packs.values()), details, _market)
+    # Cache only after the entire ERP read succeeds. Never expose these source rows to devices.
+    frappe.cache.set_value(cache_key, {"packs": entries, "full_at": now if full else cached.get("full_at", 0)}, expires_in_sec=1800)
+    return result, {"fullCheck": full, "checkedAtUtc": datetime.now().astimezone().isoformat(), "detailCalls": calls}

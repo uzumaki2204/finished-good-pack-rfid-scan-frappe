@@ -341,6 +341,55 @@ def refresh_delta(device_id, session_id, booking_id):
             "booking": booking, "session": _details(session)}
 
 
+def refresh_optimized(device_id, session_id, booking_id, mode="light", client_version=None):
+    from finished_good_pack_rfid_scan.soap import refresh_booking
+
+    if mode not in ("light", "full"):
+        raise RfidError("error.invalid_request")
+    device = approved_device(device_id)
+    session = _session(session_id, device)
+    if session.status != "Active":
+        raise RfidError("error.session_inactive")
+    old = next((b for b in _load_bookings(session_id) if key(b["bookingId"]) == key(booking_id)), None)
+    if not old:
+        raise RfidError("error.booking_not_in_session")
+    old_version = snapshot_version(old)
+    # Slow network reads must not hold the session row lock.
+    booking, check = refresh_booking(device.company, old["bookingId"], full=mode == "full", previous=old)
+    device = approved_device(device_id)
+    rows = frappe.db.sql("SELECT * FROM `tabRFID Scan Session` WHERE name=%s FOR UPDATE", (session_id,), as_dict=True)
+    if not rows or rows[0].company != device.company or rows[0].device != device.name:
+        raise RfidError("error.device_session", 403)
+    if rows[0].status != "Active":
+        raise RfidError("error.session_inactive")
+    snapshots = frappe.db.sql("SELECT payload FROM `tabRFID Booking Snapshot` WHERE session=%s ORDER BY name FOR UPDATE", (session_id,), as_dict=True)
+    current = [json.loads(row.payload) for row in snapshots]
+    latest = next((b for b in current if b["bookingId"] == old["bookingId"]), None)
+    if not latest or snapshot_version(latest) != old_version:
+        return {"stale": True, "hasChanges": False}
+    version = snapshot_version(booking)
+    changed = version != old_version
+    booking["planVersion"] = version
+    if changed:
+        session = frappe.get_doc({"doctype": SESSION, **dict(rows[0])})
+        _save_snapshot(session, booking)
+        current = [booking if b["bookingId"] == booking["bookingId"] else b for b in current]
+        _update_counts(session, current)
+    result = {"bookingId": booking["bookingId"], "baseVersion": client_version,
+              "planVersion": version, "hasChanges": changed, **check}
+    if client_version != old.get("planVersion"):
+        result["booking"] = booking
+    elif changed:
+        before = {i["finishedGoodPackDetailId"]: i for i in old.get("items", [])}
+        after = {i["finishedGoodPackDetailId"]: i for i in booking.get("items", [])}
+        result["patch"] = {
+            "metadata": {k: v for k, v in booking.items() if k != "items"},
+            "upsert": [v for k, v in after.items() if k not in before or before[k] != v],
+            "remove": sorted(set(before) - set(after)),
+        }
+    return result
+
+
 def rehydrate(device_id, session_id):
     device = approved_device(device_id)
     session = _session(session_id, device, lock=True)
