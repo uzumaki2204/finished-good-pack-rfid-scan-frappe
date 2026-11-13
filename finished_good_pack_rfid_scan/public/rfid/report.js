@@ -28,6 +28,14 @@
   const refreshButton = action => iconButton('Làm mới','M20 7v5h-5M4 17v-5h5M6.1 6.1A8 8 0 0 1 19.7 10M4.3 14A8 8 0 0 0 17.9 17.9',action);
   const viewButton = action => iconButton('Xem phiên','M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0',action);
   const backButton = action => iconButton('Tổng quan','M19 12H5m6-6-6 6 6 6',action);
+  let searchId = 0;
+  const searchable = (wrap, name, placeholder) => {
+    const el = node('input',undefined,'form-control');el.type='text';el.name=name;el.placeholder=placeholder;el.autocomplete='off';
+    const list = node('datalist');list.id=`rfid-filter-search-${++searchId}`;el.setAttribute('list',list.id);el._choices=list;
+    el.oninput=()=>el.setCustomValidity('');
+    el.validateChoice=()=>{el.setCustomValidity(!el.value || Array.from(list.options).some(o=>o.value===el.value)?'':'Vui lòng chọn một mã trong danh sách gợi ý.');return el.reportValidity();};
+    wrap.append(el,list);return el;
+  };
   const call = async (method, args = {}) => {
     const response = await frappe.call({method: API + method, args, type: 'GET'});
     if (!response || response.exc || response.message === undefined) throw new Error('Không thể tải báo cáo. Vui lòng thử lại.');
@@ -80,14 +88,16 @@
     const fields = {};
     const now = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     const input = (key,label,type='text',value='') => {
-      const wrap = node('label',label); const el = node(type === 'select' ? 'select':'input', undefined, 'form-control');
+      const wrap = node('label',label);
+      if(type==='search'){const el=searchable(wrap,key,'Gõ để tìm '+label);filters.append(wrap);fields[key]=el;return el;}
+      const el = node(type === 'select' ? 'select':'input', undefined, 'form-control');
       if (type !== 'select') el.type = type;
       el.name = key; el.value = value; wrap.append(el); filters.append(wrap); fields[key] = el; return el;
     };
     input('from_date','Từ ngày','date',now.slice(0,8)+'01'); input('to_date','Đến ngày','date',now);
     input('company','Công ty','select'); input('device','Thiết bị','select'); input('status','Trạng thái','select');
-    input('booking','Booking','select'); input('po','PO','select');
-    const option = (select,label,value='') => {const el = node('option',label);el.value = value;select.append(el);};
+    input('booking','Booking','search'); input('po','PO','search');
+    const option = (select,label,value='') => {if(select._choices && !value)return;const el = node('option',label);el.value = value;(select._choices||select).append(el);};
     option(fields.company,'Tất cả công ty'); option(fields.device,'Tất cả thiết bị');
     option(fields.status,'Tất cả trạng thái'); option(fields.booking,'Tất cả Booking'); option(fields.po,'Tất cả PO');
     const load = refreshButton(() => overview(1));
@@ -102,6 +112,7 @@
     }
     function error(target, action) {target.replaceChildren(node('p','Không thể tải dữ liệu. Vui lòng kiểm tra quyền truy cập hoặc thử lại.','text-danger'),button('Thử lại',action));}
     async function overview(pageIndex=1) {
+      if(![fields.booking,fields.po].every(el=>el.validateChoice())) return;
       const seq = ++request; selected = null; overviewPage = pageIndex; setHeading(false); root.classList.remove("rfid-report-detail");
       filters.hidden = false; info.hidden = !info.textContent; print.disabled = true; content.replaceChildren(node('p','Đang tải báo cáo…'));
       const args = Object.fromEntries(Object.entries(fields).map(([key,el]) => [key, el.value.trim()]));
@@ -156,16 +167,20 @@
         records.append(node('h4',`Chi tiết RFID · ${number.format(data.total)} dòng`));
         const detailForm = node('form',undefined,'rfid-detail-filters');
         const detailInputs = {};
-        for (const [key,label] of [['box','Số thùng'],['item','Mã hàng'],['market','Mã thị trường'],['color','Mã màu'],['size','Tên size'],['metal','Rà kim']]) {
-          const wrap = node('label',label);const select = node('select',undefined,'form-control');
+        for (const [key,label] of [['booking','Booking'],['po','PO'],['box','Số thùng'],['item','Mã hàng'],['market','Mã thị trường'],['color','Mã màu'],['size','Tên size'],['metal','Rà kim']]) {
+          const wrap = node('label',label);
+          const select = ['booking','po','box'].includes(key)?searchable(wrap,key,'Gõ để tìm '+label):node('select',undefined,'form-control');
           select.name = key;option(select,'Tất cả');
           (data.filterOptions[key] || []).forEach(v=>option(select,key==='metal'?(v==='Y'?'Đã rà kim':'Chưa rà kim'):v,v));
           if(appliedDetailFilters[key] && !(data.filterOptions[key] || []).includes(appliedDetailFilters[key])) option(select,appliedDetailFilters[key],appliedDetailFilters[key]);
-          select.value=appliedDetailFilters[key] || '';detailInputs[key]=select;wrap.append(select);detailForm.append(wrap);
+          select.value=appliedDetailFilters[key] || '';detailInputs[key]=select;if(!select._choices)wrap.append(select);detailForm.append(wrap);
         }
-        const applyFilters = () => {detailFilters=Object.fromEntries(Object.entries(detailInputs).map(([k,el])=>[k,el.value]));open(id,1);};
+        const applyFilters = () => {
+          if(!Object.values(detailInputs).every(el=>!el.validateChoice||el.validateChoice()))return;
+          detailFilters=Object.fromEntries(Object.entries(detailInputs).map(([k,el])=>[k,el.value]));open(id,1);
+        };
         const filterActions = node('div',undefined,'rfid-report-actions');
-        filterActions.append(button('Lọc',applyFilters,'btn btn-default rfid-report-action'),button('Xóa lọc',()=>{detailFilters={};open(id,1);},'btn btn-default rfid-report-action'));
+        filterActions.append(iconButton('Lọc','M3 4h18l-7 8v7l-4 2v-9z',applyFilters),iconButton('Xóa lọc','M3 4h18l-7 8v4M10 21v-9M16 17l5 5m0-5-5 5',()=>{detailFilters={};open(id,1);}));
         detailForm.append(filterActions);detailForm.onsubmit=e=>{e.preventDefault();applyFilters();};records.append(detailForm);
         if(data.total) records.append(table(detailColumns,data.items),pager(data,p=>open(id,p)));
         else records.append(node('p',Object.values(appliedDetailFilters).some(Boolean)?'Không có RFID phù hợp với bộ lọc.':completed?'Phiên này chưa có dữ liệu RFID.':'Phiên đang scan — chưa có chi tiết RFID trên máy chủ.','rfid-detail-empty'));

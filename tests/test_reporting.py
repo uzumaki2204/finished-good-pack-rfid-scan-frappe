@@ -131,12 +131,14 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(result["total"],13868)
 
     def test_detail_filters_use_bound_values_and_payload_codes(self):
-        where, args = report.detail_where("S1", dict(box="00001", item="217H060C", market="07", color="X' OR 1=1", size="L", metal="Y"))
+        where, args = report.detail_where("S1", dict(box="00001", item="217H060C", market="07", color="X' OR 1=1", size="L", metal="Y", booking="B1", po="PO1"))
         self.assertNotIn(args["color"], where)
         self.assertIn("$.sampleCode", where)
         self.assertIn("SUBSTRING", where)
         self.assertIn("$.sizeName", where)
-        self.assertEqual(len(args), 7)
+        self.assertEqual(len(args), 9)
+        self.assertIn("booking_id=%(booking)s", where)
+        self.assertIn("order_no=%(po)s", where)
         with self.assertRaises(ValueError): report.detail_where("S1", {"metal":"invalid"})
 
     def test_filtered_count_and_pagination_use_same_conditions(self):

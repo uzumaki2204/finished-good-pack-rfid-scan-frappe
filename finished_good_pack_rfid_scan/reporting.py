@@ -163,10 +163,10 @@ def overview(from_date=None, to_date=None, company=None, device=None, status=Non
 
 
 @frappe.whitelist(methods=["GET"])
-def detail(session_id, page=1, box=None, item=None, market=None, color=None, size=None, metal=None):
+def detail(session_id, page=1, box=None, item=None, market=None, color=None, size=None, metal=None, booking=None, po=None):
     record = session_record(session_id)
     page = page_number(page)
-    filters = dict(box=box, item=item, market=market, color=color, size=size, metal=metal)
+    filters = dict(box=box, item=item, market=market, color=color, size=size, metal=metal, booking=booking, po=po)
     where, args = detail_where(record.name, filters)
     total = frappe.db.sql(f"SELECT COUNT(*) FROM `tabRFID Scan Detail` WHERE {where}", args)[0][0] if any(v not in (None, "") for v in filters.values()) else frappe.db.count(service.SCAN, {"session": record.name})
     expressions = ", ".join(f"{expr} AS `{key}`" for key, expr in DETAIL_FILTERS.items())
@@ -177,6 +177,8 @@ def detail(session_id, page=1, box=None, item=None, market=None, color=None, siz
 
 
 DETAIL_FILTERS = {
+    "booking": "booking_id",
+    "po": "order_no",
     "box": "disp_pack_num",
     "item": "SUBSTRING(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.sampleCode')), 'null'), 3)",
     "market": "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.marketCode')), 'null')",
@@ -265,7 +267,7 @@ def print_report(session_id=None, from_date=None, to_date=None, company=None, de
         rows = []
         offset = 0
         while True:
-            batch = scan_items(record.name, offset, 500, dict(box=box, item=item, market=market, color=color, size=size, metal=metal))
+            batch = scan_items(record.name, offset, 500, dict(box=box, item=item, market=market, color=color, size=size, metal=metal, booking=booking, po=po))
             rows.extend(batch)
             if len(batch) < 500:
                 break
