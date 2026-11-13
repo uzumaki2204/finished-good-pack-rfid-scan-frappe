@@ -411,26 +411,49 @@ def rehydrate(device_id, session_id):
             "plannedBoxCount": sum(int(row.get("plannedBoxCount") or 0) for row in bookings)}
 
 
-def complete(device_id, session_id, vehicle, driver, note, scans):
+def complete(device_id, session_id, vehicle, driver, note, scans, _finalize=True):
     device = approved_device(device_id)
     session = _session(session_id, device, lock=True)
     if session.status == "Completed":
+        if not _finalize:
+            raise RfidError("error.session_inactive")
         return _details(session)
     if session.status != "Active":
         raise RfidError("error.session_inactive")
-    if not text(vehicle) or not text(driver):
+    if _finalize and (not text(vehicle) or not text(driver)):
         raise RfidError("error.session_header")
     bookings = _load_bookings(session_id)
     if not bookings:
         raise RfidError("error.plan_missing")
-    resolved = validate_scans(scans, bookings)
+    stored = _load_scans(session_id)
+    merged = {(x["bookingId"], x["finishedGoodPackDetailId"]): x for x in stored}
+    if not isinstance(scans, list):
+        raise RfidError("error.scan_invalid")
+    submitted_ids = set()
+    for scan in scans:
+        if not isinstance(scan,dict):
+            raise RfidError("error.scan_invalid")
+        identity = (scan.get("bookingId"), scan.get("finishedGoodPackDetailId"))
+        if identity in submitted_ids:
+            raise RfidError("error.scan_duplicate")
+        submitted_ids.add(identity)
+        if identity in merged and rfid_key(merged[identity]["rfid"]) != rfid_key(scan.get("rfid")):
+            raise RfidError("error.scan_duplicate")
+        if identity not in merged:
+            merged[identity] = scan
+    resolved = validate_scans(list(merged.values()), bookings)
+    frozen = {(x["bookingId"],x["finishedGoodPackDetailId"]):x for x in stored}
+    resolved = [frozen.get((x["bookingId"],x["finishedGoodPackDetailId"]),x) for x in resolved]
     # Serialize duplicate counting for sessions in the same company.
     frappe.db.sql("SELECT name FROM `tabCompany` WHERE name=%s FOR UPDATE", (device.company,))
+    stored_ids = {(x["bookingId"],x["finishedGoodPackDetailId"]) for x in stored}
     duplicate_count = 0
     for scan in resolved:
         normalized_rfid = rfid_key(scan["rfid"])
-        if frappe.db.exists(SCAN, {"company": device.company, "normalized_rfid": normalized_rfid}):
+        if frappe.db.exists(SCAN, {"company": device.company, "normalized_rfid": normalized_rfid,"session":["!=",session_id]}):
             duplicate_count += 1
+        if (scan["bookingId"],scan["finishedGoodPackDetailId"]) in stored_ids:
+            continue
         detail_id = scan["finishedGoodPackDetailId"]
         scan_record = {
             "doctype": SCAN, "scan_key": _hash(session_id, scan["bookingId"], detail_id),
@@ -454,17 +477,24 @@ def complete(device_id, session_id, vehicle, driver, note, scans):
                     raise ValueError("Persisted value mismatch")
             except (ValueError, TypeError) as error:
                 raise RfidError("error.scan_storage", reason=str(error)) from error
-    session.vehicle_plate_number = text(vehicle)[:100]
-    session.driver_full_name = text(driver)[:140]
-    session.note = text(note)
-    session.status = "Completed"
-    session.session_completed_at = _utc_db()
+    if _finalize:
+        session.vehicle_plate_number = text(vehicle)[:100]
+        session.driver_full_name = text(driver)[:140]
+        session.note = text(note)
+        session.status = "Completed"
+        session.session_completed_at = _utc_db()
     session.total_scanned_count = len(resolved)
     session.metal_checked_count = sum(_metal(scan.get("isMetalCheck")) for scan in resolved)
     session.cross_session_duplicate_count = duplicate_count
     session.completion_hash = _hash(_json(sorted(resolved, key=lambda row: row["finishedGoodPackDetailId"])))
     session.save(ignore_permissions=True)
-    return _details(session)
+    return _details(session) if _finalize else {"sessionId":session_id,"syncedCount":len(resolved)}
+
+
+def sync_scans(device_id, session_id, scans):
+    if not isinstance(scans,list) or not 1 <= len(scans) <= 100:
+        raise RfidError("error.invalid_request")
+    return complete(device_id, session_id, "", "", "", scans, _finalize=False)
 
 
 def delete_session(device_id, session_id):

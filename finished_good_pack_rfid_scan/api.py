@@ -18,6 +18,7 @@ READ = {
     "preview_conflicts": lambda d: service.preview_conflicts(_device(d), _array(d.get("bookingIds"))),
 }
 WRITE = {
+    "sync_scans": lambda d: service.sync_scans(_device(d), d.get("sessionId"), d.get("scans")),
     "delete_photo": lambda d: photos.delete(_device(d), d.get("sessionId"), d.get("photoId")),
     "start": lambda d: service.start_session(_device(d), d.get("bookingIds"), d.get("vehiclePlateNumber"),
                                              d.get("driverFullName"), d.get("confirmConflicts") is True),

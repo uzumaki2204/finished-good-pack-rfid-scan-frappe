@@ -145,9 +145,9 @@
           const card = node('div',undefined,'rfid-detail-metric');
           card.append(node('span',label),node('strong',value),node('small',caption));metrics.append(card);
         };
-        metric('Hàng đã scan',completed?number.format(session.scannedItems ?? 0):'—',`Kế hoạch: ${number.format(session.plannedItems ?? 0)} hàng`);
-        metric('Thùng đã scan',completed?number.format(session.scannedBoxes ?? 0):'—',`Kế hoạch: ${number.format(session.plannedBoxes ?? 0)} thùng`);
-        metric('Hàng đã rà kim',completed?number.format(session.metalChecked ?? 0):'—',completed?'Dữ liệu đã lưu trên máy chủ':'Chưa đồng bộ');
+        metric('Hàng đã scan',number.format(session.scannedItems ?? 0),`Kế hoạch: ${number.format(session.plannedItems ?? 0)} hàng`);
+        metric('Thùng đã scan',number.format(session.scannedBoxes ?? 0),`Kế hoạch: ${number.format(session.plannedBoxes ?? 0)} thùng`);
+        metric('Hàng đã rà kim',number.format(session.metalChecked ?? 0),'Dữ liệu đã lưu trên máy chủ');
         const details = node('div',undefined,'rfid-detail-info-grid');
         const infoCard = (label,keys) => {
           const card = node('section',undefined,'rfid-detail-card');
@@ -164,7 +164,7 @@
         const grid = node('div',undefined,'rfid-report-gallery'); const photoStatus = node('div',undefined,'rfid-detail-empty');
         photosSection.append(node('h4','Hình ảnh'),grid,photoStatus);
         content.replaceChildren(header,heading,metrics);
-        if(!completed) content.append(node('p','Chưa đồng bộ dữ liệu scan. Số liệu và chi tiết RFID sẽ hiển thị sau khi phiên được hoàn thành.','rfid-detail-notice'));
+        if(!completed) content.append(node('p','Phiên đang scan. Hiển thị các lượt đã đồng bộ lên máy chủ; lượt quét khi mất mạng sẽ được gửi khi có mạng trở lại.','rfid-detail-notice'));
         content.append(details);
         const records = node('section',undefined,'rfid-detail-card rfid-detail-records');
         const recordsHeading = node('div',undefined,'rfid-detail-records-heading');

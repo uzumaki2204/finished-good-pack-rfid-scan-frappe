@@ -42,7 +42,8 @@ class ServicePolicyTest(unittest.TestCase):
         record = types.SimpleNamespace(name="SESSION-1", company="COMP-1", device="DEVICE-1", status="Active")
         with patch.object(service, "approved_device", return_value=self.device), \
              patch.object(service, "_session", return_value=record), \
-             patch.object(service, "_load_bookings", return_value=[fixture()]):
+             patch.object(service, "_load_bookings", return_value=[fixture()]), \
+             patch.object(service, "_load_scans", return_value=[]):
             with self.assertRaises(RfidError) as error:
                 service.complete(self.device.name, record.name, "51A-12345", "Driver", "", [
                     {"bookingId": "B-1", "finishedGoodPackDetailId": "FORGED", "rfid": "RFID-1", "scannedAtUtc": "2026-01-01T00:00:00Z"}

@@ -112,7 +112,8 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(rows[0]["bookingIds"],["B1","B2"])
         self.assertEqual(rows[0]["scannedBoxes"],2)
         self.assertEqual(rows[1]["plannedItems"],10)
-        for key in ("scannedItems","metalChecked","scannedBoxes"): self.assertIsNone(rows[1][key])
+        self.assertEqual(rows[1]["scannedItems"],8)
+        self.assertEqual(rows[1]["metalChecked"],7)
         self.assertIn("GROUP BY session, booking_id, order_no, do_no, disp_pack_num",self.db.sql.call_args.args[0])
 
     def test_detail_uses_frozen_payload_missing_fields_and_100_row_page(self):

@@ -120,9 +120,9 @@ def summaries(rows):
             "vehicle": row.vehicle_plate_number, "driver": row.driver_full_name, "note": row.note,
             "startedAt": service._iso(row.session_started_at), "completedAt": service._iso(row.session_completed_at),
             "plannedItems": row.planned_item_count, "plannedBoxes": row.planned_box_count,
-            "scannedItems": row.total_scanned_count if completed else None,
-            "metalChecked": row.metal_checked_count if completed else None,
-            "scannedBoxes": counts.get(row.name, 0) if completed else None})
+            "scannedItems": row.total_scanned_count,
+            "metalChecked": row.metal_checked_count,
+            "scannedBoxes": counts.get(row.name, 0)})
     return result
 
 

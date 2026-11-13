@@ -271,7 +271,9 @@
       try { local = await scansForSession(); }
       catch { storageReady = false; }
     }
-    const scans = s.sessionStatus === 'Completed' ? (s.scannedItems || []) : local;
+    const mergedScans = new Map((s.scannedItems || []).map(x=>[x.bookingId+'|'+x.finishedGoodPackDetailId,x]));
+    local.forEach(x=>mergedScans.set(x.bookingId+'|'+x.finishedGoodPackDetailId,x));
+    const scans = [...mergedScans.values()];
     const plannedItems = (s.preloadedBookings || []).flatMap(b => (b.items || []).map(item => ({ ...item, bookingId: b.bookingId })));
     const plannedById = new Map(plannedItems.map(item => [`${item.bookingId}|${item.finishedGoodPackDetailId}`, item]));
     const metalCount = scans.filter(scan => {
@@ -536,6 +538,30 @@
       else notice('error.offline_storage', 'warning');
     } catch (error) { explain(error); }
     finally { button.disabled = false; button.textContent = i18n.text('ui.start'); }
+  };
+  let syncingScans = false;
+  const scanAcknowledgements = new Map();
+  const syncStatus = message => {
+    let el = document.getElementById('scan-sync-status');
+    if (!el) {el = document.createElement('p');el.id='scan-sync-status';el.setAttribute('role','status');$('session-view').prepend(el);}
+    el.textContent = message;
+  };
+  const syncScans = async () => {
+    const session = state.session;
+    if (syncingScans || !navigator.onLine || session?.sessionStatus !== 'Active' || state.completing || state.completionPending) return;
+    syncingScans = true;
+    try {
+      const id = session.sessionId;
+      const acknowledged = scanAcknowledgements.get(id) || new Set();
+      scanAcknowledgements.set(id, acknowledged);
+      const scans = await store.scans(id);
+      const pending = scans.filter(x=>!acknowledged.has(x.bookingId+'|'+x.finishedGoodPackDetailId)).slice(0,100);
+      if (!pending.length) {syncStatus('Đã đồng bộ các lượt quét trên thiết bị.');return;}
+      syncStatus('Đang đồng bộ lượt quét…');
+      await api('sync_scans',{sessionId:id,scans:pending},'POST');
+      pending.forEach(x=>acknowledged.add(x.bookingId+'|'+x.finishedGoodPackDetailId));
+    } catch (error) { syncStatus('Chưa đồng bộ thành công. Lượt quét vẫn lưu trên thiết bị và sẽ tự thử lại.'); }
+    finally { syncingScans = false; }
   };
   const addScan = async (rfid, sessionId, focusAfter = false) => {
     if (!state.session || state.session.sessionId !== sessionId || state.session.sessionStatus !== 'Active'
@@ -882,7 +908,8 @@
     expandPageShell();
     i18n.render(); renderNetwork();
     window.RfidPhotos.init({ api, context: () => ({ deviceId: state.device?.id, sessionId: state.session?.sessionId }) });
-    window.addEventListener('online', renderNetwork); window.addEventListener('offline', renderNetwork);
+    window.addEventListener('online', () => {renderNetwork();void syncScans();});
+    window.setInterval(() => {void syncScans();},5000); window.addEventListener('offline', renderNetwork);
     window.setInterval(() => {
       if (!navigator.onLine || document.hidden || $('session-view').hidden
           || state.session?.sessionStatus !== 'Active' || state.refreshing || state.refreshRequest
