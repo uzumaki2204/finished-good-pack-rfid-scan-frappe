@@ -132,7 +132,8 @@ def _update_counts(session, bookings):
 def _card(session, bookings=None, scans=None):
     bookings = bookings if bookings is not None else _load_bookings(session.name)
     scans = scans if scans is not None else _load_scans(session.name)
-    planned_boxes = sum(int(booking.get("plannedBoxCount") or 0) for booking in bookings)
+    planned_boxes = sum(int(booking.get("plannedBoxCount") or 0) for booking in bookings) if bookings else int(session.planned_box_count or 0)
+    history_orders = {order for booking in bookings for order in booking.get("orderNos", [])} or {scan.get("orderNo") for scan in scans if scan.get("orderNo")}
     scanned_boxes = len({
         (scan.get("bookingId"), scan.get("orderNo"), scan.get("doNo"), scan.get("dispPackNum"))
         for scan in scans if scan.get("dispPackNum")
@@ -162,9 +163,9 @@ def _card(session, bookings=None, scans=None):
         "boxTotalCount": planned_boxes,
         "hasPlanningMismatch": bool(warnings),
         "planningWarnings": warnings,
-        "bookingIds": [booking["bookingId"] for booking in bookings],
-        "orderNos": sorted({order for booking in bookings for order in booking.get("orderNos", [])}),
-        "purchaseOrderCount": len({order for booking in bookings for order in booking.get("orderNos", [])}),
+        "bookingIds": [booking["bookingId"] for booking in bookings] or json.loads(session.booking_ids_json or "[]"),
+        "orderNos": sorted(history_orders),
+        "purchaseOrderCount": len(history_orders),
         "requiresOnlineCompletion": session.status == "Active",
         "completionWarnings": ([message("warning.cross_session_duplicate", count=session.cross_session_duplicate_count)]
                                if session.cross_session_duplicate_count else []),
