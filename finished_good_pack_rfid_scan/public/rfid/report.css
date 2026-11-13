@@ -87,5 +87,8 @@
 
 .rfid-detail-records-heading {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .rfid-detail-records-heading h4 {margin:0}
-.rfid-detail-records-heading label {display:flex;align-items:center;gap:8px;margin:0;font-size:12px;font-weight:500}
-.rfid-detail-records-heading select {width:85px}
+.rfid-report-page-size {display:flex;align-items:center;gap:8px;margin:0;font-size:12px;font-weight:500}
+.rfid-report-page-size select {width:85px}
+
+.rfid-report-page-controls {display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+@media(max-width:600px) {.rfid-report-page-controls {width:100%;justify-content:flex-start}.rfid-report-page-size {margin-right:auto}}

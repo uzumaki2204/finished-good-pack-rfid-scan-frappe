@@ -72,11 +72,14 @@
     if (!rows.length) {const td = node('td','Không có dữ liệu.'); td.colSpan = columns.length + (onOpen ? 1 : 0); const tr = node('tr');tr.append(td);body.append(tr);}
     tableEl.append(body); scroll.append(tableEl); return scroll;
   }
-  function pager(data, change) {
+  function pager(data, change, pageSizeControl) {
     const row = node('div', undefined, 'rfid-report-pager');
     const previous = button('Trang trước', () => change(data.page - 1)); previous.disabled = data.page <= 1;
     const next = button('Trang sau', () => change(data.page + 1)); next.disabled = data.page * data.pageSize >= data.total;
-    row.append(node('span', `${number.format(data.total)} dòng · Trang ${data.page}/${Math.max(1, Math.ceil(data.total / data.pageSize))}`), previous, next);
+    row.append(node('span', `${number.format(data.total)} dòng · Trang ${data.page}/${Math.max(1, Math.ceil(data.total / data.pageSize))}`));
+    const controls = node('div', undefined, 'rfid-report-page-controls');
+    if (pageSizeControl) controls.append(pageSizeControl);
+    controls.append(previous, next);row.append(controls);
     return row;
   }
   function mount(page) {
@@ -166,12 +169,12 @@
         const records = node('section',undefined,'rfid-detail-card rfid-detail-records');
         const recordsHeading = node('div',undefined,'rfid-detail-records-heading');
         recordsHeading.append(node('h4',`Chi tiết RFID · ${number.format(data.total)} dòng`));
-        const sizeLabel = node('label','Số dòng mỗi trang');
+        const sizeLabel = node('label','Số dòng mỗi trang','rfid-report-page-size');
         const sizeSelect = node('select',undefined,'form-control');sizeSelect.name='page_size';
         [25,50,100,200,500].forEach(n=>option(sizeSelect,String(n),String(n)));
         sizeSelect.value=String(detailPageSize);
         sizeSelect.onchange=()=>{detailPageSize=Number(sizeSelect.value);open(id,1);};
-        sizeLabel.append(sizeSelect);recordsHeading.append(sizeLabel);records.append(recordsHeading);
+        sizeLabel.append(sizeSelect);records.append(recordsHeading);
         const detailForm = node('form',undefined,'rfid-detail-filters');
         const detailInputs = {};
         for (const [key,label] of [['booking','Booking'],['po','PO'],['box','Số thùng'],['item','Mã hàng'],['market','Mã thị trường'],['color','Mã màu'],['size','Tên size'],['metal','Rà kim']]) {
@@ -189,7 +192,7 @@
         const filterActions = node('div',undefined,'rfid-report-actions');
         filterActions.append(iconButton('Lọc','M3 4h18l-7 8v7l-4 2v-9z',applyFilters),iconButton('Xóa lọc','M3 4h18l-7 8v4M10 21v-9M16 17l5 5m0-5-5 5',()=>{detailFilters={};open(id,1);}));
         detailForm.append(filterActions);detailForm.onsubmit=e=>{e.preventDefault();applyFilters();};records.append(detailForm);
-        if(data.total) records.append(table(detailColumns,data.items),pager(data,p=>open(id,p)));
+        if(data.total) records.append(table(detailColumns,data.items),pager(data,p=>open(id,p),sizeLabel));
         else records.append(node('p',Object.values(appliedDetailFilters).some(Boolean)?'Không có RFID phù hợp với bộ lọc.':completed?'Phiên này chưa có dữ liệu RFID.':'Phiên đang scan — chưa có chi tiết RFID trên máy chủ.','rfid-detail-empty'));
         content.append(records,photosSection);
         gallery(id,seq,grid,photoStatus);
