@@ -19,3 +19,16 @@ The maintenance lock prevents concurrent runs. Exceptions roll back the current 
 ## Initial inventory (2026-11-13)
 
 158,966 valid scan JSON objects, 27 source keys, 114,792,819 bytes. All rows passed lossless dry-run conversion after retaining the legacy timestamp representation. Added source-field contents plus layout estimated 34,197,057 bytes, excluding physical row/index overhead. All 195 existing Booking Snapshots had empty `items` and `summaryRows`; their 49,461 bytes were retained unchanged.
+
+## Completed Dev migration (2026-11-13)
+
+- Runtime 0.1.44 deployed and migrated through Pilot.
+- Database backup created before conversion and validated with `gzip -t`.
+- Backfilled and individually verified 158,966 rows; cleaned 158,966 duplicate JSON payloads; retained/error rows: 0.
+- Removed JSON content: 114,792,819 bytes. Added source-field contents and layout: 34,197,057 bytes. Net content reduction: 80,595,762 bytes (76.86 MiB). These figures exclude row/index overhead and do not claim physical database file shrinkage.
+- Aggregate digest before/backfill/cleanup unchanged: `bf360f583f41579f19047ff30fe4db0fb0c3da49d6f7aff44be15adfad6e1ab4`.
+- Booking snapshots unchanged: 195 rows, 49,461 bytes. Their empty item/summary lists were recorded, not rebuilt from ERP.
+- Post-cleanup: decoded all 158,966 records; verified a 11,712-row session history, eight simultaneous detail filters (12 results), last-page pagination (212 rows), and printed sampleCode/setCode/PO.
+- Rollback-only live scenario verified structured new writes, persisted source round trip, repeated completion without duplicate rows, and unknown-field JSON fallback. No test sessions retained.
+- Automated verification: 85 Python tests and 9 client refresh scenarios passed.
+- Maintenance progress and baseline comparisons remain in the `RFID Snapshot Migration` record `scan-storage-v1`.
