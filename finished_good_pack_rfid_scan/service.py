@@ -65,7 +65,7 @@ def _booking_ids(values):
     return output
 
 
-def _session(session_id, device, lock=False):
+def _session(session_id, device, lock=False, read_only=False):
     if not isinstance(session_id, str) or not session_id:
         raise RfidError("error.session_missing", 404)
     if lock:
@@ -75,7 +75,7 @@ def _session(session_id, device, lock=False):
     record = frappe.get_doc(SESSION, session_id)
     if record.company != device.company or record.status == "Deleted":
         raise RfidError("error.session_missing", 404)
-    if record.device != device.name:
+    if not read_only and record.device != device.name:
         raise RfidError("error.device_session", 403)
     return record
 
@@ -290,26 +290,31 @@ def create_session(device_id, vehicle="", driver=""):
     return _details(session)
 
 
+def _view_card(session, device):
+    return {**_card(session), "readOnly": session.device != device.name}
+
+
 def active_sessions(device_id):
     device = approved_device(device_id)
-    rows = frappe.db.get_all(SESSION, filters={"company": device.company, "device": device.name, "status": "Active"}, fields=["name"], order_by="session_started_at desc")
-    return [_card(frappe.get_doc(SESSION, row.name)) for row in rows]
+    rows = frappe.db.get_all(SESSION, filters={"company": device.company, "status": "Active"}, fields=["name"], order_by="session_started_at desc")
+    return [_view_card(frappe.get_doc(SESSION, row.name), device) for row in rows]
 
 
 def history(device_id, status="Completed", page_index=1):
     device = approved_device(device_id)
     page_index = max(1, int(page_index or 1))
-    filters = {"company": device.company, "device": device.name,
+    filters = {"company": device.company,
                "status": status if status in ("Active", "Completed") else "Completed"}
     total = frappe.db.count(SESSION, filters=filters)
     rows = frappe.db.get_all(SESSION, filters=filters, fields=["name"], order_by="session_completed_at desc, session_started_at desc", limit_start=(page_index - 1) * 5, limit_page_length=5)
-    return {"items": [_card(frappe.get_doc(SESSION, row.name)) for row in rows], "totalCount": total,
+    return {"items": [_view_card(frappe.get_doc(SESSION, row.name), device) for row in rows], "totalCount": total,
             "pageIndex": page_index, "pageSize": 5, "totalPages": (total + 4) // 5}
 
 
 def get_session(device_id, session_id):
     device = approved_device(device_id)
-    return _details(_session(session_id, device))
+    session = _session(session_id, device, read_only=True)
+    return {**_details(session), "readOnly": session.device != device.name}
 
 
 def preload(device_id, booking_id, session_id=None):

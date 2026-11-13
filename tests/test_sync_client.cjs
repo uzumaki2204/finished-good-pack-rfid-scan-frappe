@@ -24,5 +24,6 @@ function setup(n=1){
  const mergeCode=source.slice(source.indexOf('  const scansForSession ='),source.indexOf('  const scansForSession =')+source.slice(source.indexOf('  const scansForSession =')).indexOf('\n  };')+5)+'\nglobalThis.read=scansForSession;';
  ctx.state.session={sessionId:'S',scannedItems:[{bookingId:'B',finishedGoodPackDetailId:'0',rfid:'saved'}]};
  vm.runInContext(mergeCode,ctx);const merged=await ctx.read();assert.equal(merged.length,1);assert.equal(merged[0].rfid,'saved');
+ ({ctx,calls}=setup());ctx.state.session.readOnly=true;await ctx.sync();assert.equal(calls.length,0);
  console.log('Scan sync: batching, retry, offline, completion guard, concurrency, navigation and server recovery passed');
 })().catch(error=>{console.error(error);process.exit(1);});

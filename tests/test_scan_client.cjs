@@ -13,5 +13,6 @@ function setup(){
  ctx.state.completing=true;await ctx.enqueue('ABC123');assert.equal(scans.length,1);
  ctx.state.completing=false;ctx.state.session.sessionStatus='Completed';await ctx.enqueue('ABC123');assert.equal(scans.length,1);
  ({ctx,scans,notices}=setup());ctx.store.put=async()=>{throw Error('disk full')};await ctx.enqueue('ABC123');assert.equal(scans.length,0);assert.equal(notices.at(-1),'error.offline_storage');
+ ({ctx,scans,notices}=setup());ctx.state.session.readOnly=true;await ctx.enqueue('ABC123');assert.equal(scans.length,0);
  console.log('Client scan queue: valid scan, duplicate, unknown RFID, completion guard and storage failure passed');
 })().catch(e=>{console.error(e);process.exit(1)});

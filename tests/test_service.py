@@ -18,6 +18,29 @@ class ServicePolicyTest(unittest.TestCase):
     def setUp(self):
         self.device = types.SimpleNamespace(name="DEVICE-1", company="COMP-1")
 
+    def test_company_view_never_grants_session_mutations(self):
+        record = types.SimpleNamespace(name="SESSION-1", company="COMP-1", device="OWNER", status="Active")
+        fake_db = types.SimpleNamespace(exists=lambda *_: True, sql=lambda *_: None)
+        with patch.object(service, "approved_device", return_value=self.device), \
+             patch.object(service.frappe, "db", fake_db, create=True), \
+             patch.object(service.frappe, "get_doc", return_value=record, create=True), \
+             patch.object(service, "_details", return_value={"sessionId": record.name}):
+            for status in ("Active", "Completed"):
+                record.status = status
+                self.assertTrue(service.get_session(self.device.name, record.name)["readOnly"])
+                actions = [lambda: service.complete(self.device.name, record.name, "", "", "", []),
+                    lambda: service.sync_scans(self.device.name, record.name, [{}]),
+                    lambda: service.delete_session(self.device.name, record.name),
+                    lambda: service.refresh_delta(self.device.name, record.name, "B"),
+                    lambda: service.rehydrate(self.device.name, record.name)]
+                for action in actions:
+                    with self.assertRaises(RfidError) as error: action()
+                    self.assertEqual(error.exception.status,403)
+            record.status = "Deleted"
+            with self.assertRaises(RfidError): service.get_session(self.device.name, record.name)
+            record.status = "Active"; record.company = "OTHER"
+            with self.assertRaises(RfidError): service.get_session(self.device.name, record.name)
+
     def test_start_requires_conflict_confirmation_after_company_lock(self):
         booking = fixture()
         fake_db = types.SimpleNamespace(sql=lambda *_: None)

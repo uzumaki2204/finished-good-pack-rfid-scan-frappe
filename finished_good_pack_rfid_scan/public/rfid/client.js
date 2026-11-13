@@ -274,7 +274,7 @@
     $('session-booking').textContent = `Booking: ${(s.preloadedBookings || []).map(b => b.displayBookingId || b.bookingId).join(', ')}`;
     let local = [];
     let storageReady = true;
-    if (s.sessionStatus !== 'Completed') {
+    if (s.sessionStatus !== 'Completed' && !s.readOnly) {
       try { local = await scansForSession(); }
       catch { storageReady = false; }
     }
@@ -287,13 +287,14 @@
       const item = plannedById.get(`${scan.bookingId}|${scan.finishedGoodPackDetailId}`);
       return ['Y', 'YES', 'TRUE', '1'].includes(normalized(item?.isMetalCheck || scan.isMetalCheck));
     }).length;
-    const editable = s.sessionStatus === 'Active';
+    const editable = s.sessionStatus === 'Active' && !s.readOnly;
     if (!editable) state.completing = false;
     lockCompletionNavigation(state.refreshing || (editable && state.completing));
     show('scan-dock', !state.completing);
     show('scan-controls', editable);
     show('session-photos', !editable);
     show('refresh-session', editable);
+    show('complete-session', editable);
     $('refresh-session').disabled = !editable || state.refreshing;
     $('complete-session').disabled = !editable || state.refreshing;
     show('scan-dock-spacer', !state.completing);
@@ -466,6 +467,7 @@
       meta.append(node('div', '', `${i18n.text('ui.driver')}: ${row.driverFullName || '—'}`),
         node('div', '', i18n.text('ui.item_po', { po: (row.orderNos || []).join(', ') || '—' })));
       if (row.vehiclePlateNumber) meta.append(node('div', '', `${i18n.text('ui.vehicle')}: ${row.vehiclePlateNumber}`));
+      if (row.readOnly) meta.append(node('div', '', `Chỉ xem · Thiết bị tạo phiên: ${row.deviceName || row.deviceId}`));
       const metrics = node('div', 'rfid-card-metrics');
       const count = active ? (scanCounts.get(row.sessionId) ?? row.totalScannedCount ?? 0) : (row.totalScannedCount || 0);
       const metricValues = active
@@ -475,9 +477,9 @@
         const metric = node('div'); metric.append(node('small', 'text-muted', i18n.text(label)), node('strong', '', number)); metrics.append(metric);
       }
       const actions = node('div', 'rfid-card-actions');
-      const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'btn btn-default btn-sm mr-2 mt-2'; openButton.textContent = i18n.text(active ? 'ui.continue' : 'ui.view_details'); openButton.onclick = () => openSession(row.sessionId);
+      const openButton = document.createElement('button'); openButton.type = 'button'; openButton.className = 'btn btn-default btn-sm mr-2 mt-2'; openButton.textContent = i18n.text(active && !row.readOnly ? 'ui.continue' : 'ui.view_details'); openButton.onclick = () => openSession(row.sessionId);
       actions.append(openButton);
-      if (active) {
+      if (active && !row.readOnly) {
         const completeButton = document.createElement('button'); completeButton.type = 'button'; completeButton.className = 'btn btn-primary btn-sm mr-2 mt-2'; completeButton.textContent = i18n.text('ui.complete_short');
         completeButton.onclick = async () => { completeButton.disabled = true; try { if (await openSession(row.sessionId)) await beginCompletion(); } finally { completeButton.disabled = false; } };
         const deleteButton = document.createElement('button'); deleteButton.type = 'button'; deleteButton.className = 'btn btn-danger btn-sm mt-2'; deleteButton.textContent = i18n.text('ui.delete');
@@ -555,7 +557,7 @@
   };
   const syncScans = async () => {
     const session = state.session;
-    if (syncingScans || !navigator.onLine || session?.sessionStatus !== 'Active' || state.completing || state.completionPending) return;
+    if (session?.readOnly || syncingScans || !navigator.onLine || session?.sessionStatus !== 'Active' || state.completing || state.completionPending) return;
     syncingScans = true;
     try {
       const id = session.sessionId;
@@ -573,7 +575,7 @@
     finally { syncingScans = false; }
   };
   const addScan = async (rfid, sessionId, focusAfter = false) => {
-    if (!state.session || state.session.sessionId !== sessionId || state.session.sessionStatus !== 'Active'
+    if (state.session?.readOnly || !state.session || state.session.sessionId !== sessionId || state.session.sessionStatus !== 'Active'
       || state.completing || state.completionPending) return;
     const lookupRfid = normalizedRfid(rfid);
     if (!lookupRfid) return;
@@ -598,7 +600,7 @@
       notice('success.scan_saved', 'success'); await renderSession();
     } catch { notice('error.offline_storage', 'danger'); }
   };
-  const canCaptureScans = () => state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending && !state.scanPaused && !state.refreshing
+  const canCaptureScans = () => !state.session?.readOnly && state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending && !state.scanPaused && !state.refreshing
     && !$('photo-dialog').open && !$('device-info-modal').open && !$('session-view').hidden && !$('scan-dock').hidden && $('item-detail-modal').hidden;
   const enqueueScan = (rfid, focusAfter = false, sessionId = state.session?.sessionId) => {
     if (!sessionId) return Promise.resolve();
@@ -702,7 +704,7 @@
     appendScannerText(text);
   };
   const beginCompletion = async () => {
-    if (!state.session || state.session.sessionStatus !== 'Active') return;
+    if (state.session?.readOnly || !state.session || state.session.sessionStatus !== 'Active') return;
     if (!navigator.onLine) return notice('ui.network_required', 'warning');
     try {
       await scanQueue;
@@ -738,7 +740,7 @@
     clearNotice(); $('rfid-input').focus();
   };
   const complete = async () => {
-    if (!state.completing || state.completionPending || state.session?.sessionStatus !== 'Active') return;
+    if (state.session?.readOnly || !state.completing || state.completionPending || state.session?.sessionStatus !== 'Active') return;
     if (!navigator.onLine) return notice('ui.network_required', 'warning');
     const vehiclePlateNumber = value('completion-vehicle'), driverFullName = value('completion-driver');
     if (!vehiclePlateNumber || !driverFullName) {
@@ -854,7 +856,7 @@
   const hasCartonMismatch = booking => Number(booking.headerPlannedCartonCount || 0) > 0
     && Number(booking.headerActualCartonCount || 0) !== Number(booking.headerPlannedCartonCount);
   const refreshSession = async ({ automatic = false } = {}) => {
-    if (state.completing || state.completionPending || state.refreshing || state.refreshRequest || state.session?.sessionStatus !== 'Active') return;
+    if (state.session?.readOnly || state.completing || state.completionPending || state.refreshing || state.refreshRequest || state.session?.sessionStatus !== 'Active') return;
     if (!navigator.onLine) return automatic ? undefined : notice('ui.network_required', 'warning');
     const sessionId = state.session.sessionId;
     const deviceId = state.device?.id;
@@ -921,7 +923,7 @@
     window.setInterval(() => {void syncScans();},5000); window.addEventListener('offline', renderNetwork);
     window.setInterval(() => {
       if (!navigator.onLine || document.hidden || $('session-view').hidden
-          || state.session?.sessionStatus !== 'Active' || state.refreshing || state.refreshRequest
+          || state.session?.readOnly || state.session?.sessionStatus !== 'Active' || state.refreshing || state.refreshRequest
           || state.completing || state.completionPending || $('rfid-input').value
           || $('photo-dialog').open || $('device-info-modal').open || !$('item-detail-modal').hidden) return;
       if ((state.session.preloadedBookings || []).some(hasCartonMismatch)) {
