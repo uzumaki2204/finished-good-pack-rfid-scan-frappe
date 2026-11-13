@@ -12,9 +12,10 @@
       "label": "Scan Key",
       "fieldtype": "Data",
       "length": 64,
-      "reqd": 1,
+      "reqd": 0,
       "unique": 1,
-      "hidden": 1
+      "hidden": 1,
+      "read_only": 1
     },
     {
       "fieldname": "session",
@@ -60,7 +61,8 @@
       "label": "Normalized RFID",
       "fieldtype": "Data",
       "length": 200,
-      "reqd": 1
+      "reqd": 0,
+      "read_only": 1
     },
     {
       "fieldname": "scanned_at",
@@ -271,14 +273,18 @@
       "read": 1,
       "report": 1,
       "export": 1,
-      "write": 1
+      "write": 1,
+      "create": 1,
+      "import": 1
     },
     {
       "role": "RFID Scan Manager",
       "read": 1,
       "report": 1,
       "export": 1,
-      "write": 1
+      "write": 1,
+      "create": 1,
+      "import": 1
     }
   ],
   "field_order": [
@@ -322,5 +328,6 @@
     "used_pack_num",
     "storage_version",
     "source_layout"
-  ]
+  ],
+  "allow_import": 1
 }
