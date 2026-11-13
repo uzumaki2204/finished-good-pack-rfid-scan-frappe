@@ -1,6 +1,8 @@
 import json
 import types
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 import test_scan_storage as fixtures
 from finished_good_pack_rfid_scan import snapshot_migration as m, scan_storage as st
@@ -62,6 +64,23 @@ class MigrationTests(unittest.TestCase):
         db.sql.return_value=[(0,)];db.sql.side_effect=None
         with self.assertRaises(RuntimeError):m.run()
         db.set_value.assert_not_called()
+
+    def test_cleanup_rechecks_persisted_values_and_preserves_corruption(self):
+        row,job,db=self.setup_run()
+        row.update(st.encode_scan(json.loads(row.payload),row))
+        row["warehouse"]="corrupted"
+        with tempfile.TemporaryDirectory() as folder:
+            backup=Path(folder)/"db.sql.gz";backup.write_bytes(b"test backup fixture")
+            with patch.object(m.frappe,"get_site_path",return_value=folder):
+                def sql(query,*args,**kwargs):
+                    if "GET_LOCK" in query:return [(1,)]
+                    if "SELECT *" in query:return [row] if not job.cleanup_cursor else []
+                    return []
+                db.sql.side_effect=sql
+                m.run(stage="cleanup",backup_path=str(backup))
+        self.assertTrue(row.payload)
+        self.assertIn("mismatch",row.storage_error)
+        self.assertEqual(job.cleaned_rows,0)
 
     def test_cleanup_requires_real_backup(self):
         row,job,db=self.setup_run()
