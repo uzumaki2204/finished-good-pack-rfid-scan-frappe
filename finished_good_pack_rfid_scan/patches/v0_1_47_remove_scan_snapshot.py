@@ -21,6 +21,6 @@ def execute():
         for row in frappe.get_all("Property Setter", filters={"doc_type":name,"field_name":["in",editable],"property":"read_only"}, pluck="name"):
             frappe.delete_doc("Property Setter", row, ignore_permissions=True)
         for row in frappe.get_all("Custom DocPerm", filters={"parent":name,"role":["in",["System Manager","RFID Scan Manager"]]}, fields=["name","role"]):
-            if any(p.role == row.role and p.write for p in meta.permissions):
+            if row.role == "System Manager" or name != "RFID Session Photo":
                 frappe.db.set_value("Custom DocPerm", row.name, "write", 1)
         frappe.clear_cache(doctype=name)
