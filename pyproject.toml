@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "finished_good_pack_rfid_scan"
-version = "0.1.44"
+version = "0.1.45"
 description = "Finished good pack RFID scanning for Frappe 16"
 readme = "README.md"
 requires-python = ">=3.14"

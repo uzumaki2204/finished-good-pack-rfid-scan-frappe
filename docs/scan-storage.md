@@ -6,7 +6,17 @@ The source timestamp and source metal-check string are retained separately from 
 
 New writes verify the persisted fields and fall back to the original JSON for unknown keys, long values, unsupported types or conflicts. Readers support both formats. Booking Plan Snapshot is unchanged.
 
-## Deployment and maintenance
+## Production installation (0.1.45)
+
+Fresh production installs do not create `RFID Snapshot Migration`. The one-time backfill/cleanup module and its DocType were removed from the package after Dev conversion. No data-conversion command is required for an empty site. Normal Frappe install/migrate remains necessary for schema, roles, routes and indexes.
+
+`RFID Booking Snapshot` is required runtime data, not a migration log: it holds the session plan used by completion validation, refresh, recovery, unscanned-item comparison and reports. Keep it even on an initially empty site. Also keep `RFID Scan Session`, `RFID Scan Detail`, `RFID Session Photo` and `RFID SOAP Account`.
+
+The legacy JSON reader and fallback remain to preserve unexpected source fields. New supported scan records use explicit fields directly. Existing Dev migration audit data is not automatically deleted; this release adds no destructive schema/data cleanup hook.
+
+## Historical deployment and maintenance (0.1.44 only)
+
+The commands below document the completed Dev operation, not instructions for a fresh production install. The migration tools are available in Git commit `563d38f` only; do not run them against 0.1.45. Sites with unconverted legacy data should complete and verify conversion with 0.1.44 before upgrading.
 
 1. Back up the site database. Deploy/migrate the schema and dual readers first. No schema migration clears data automatically.
 2. As Administrator/System Manager, run `finished_good_pack_rfid_scan.snapshot_migration.run(stage="backfill")`. Batches of 1000 commit fields and cursor together. Check the `RFID Snapshot Migration` record `scan-storage-v1` and per-row `storage_error`.
