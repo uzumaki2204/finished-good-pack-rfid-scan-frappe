@@ -106,7 +106,7 @@
     filterActions.append(load,print); filters.append(filterActions);
     const info = node('p','','text-danger'); info.hidden = true;
     const content = node('section'); root.append(filters,info,content);
-    let request = 0, selected = null, overviewPage = 1, devices = [], detailFilters = {};
+    let request = 0, selected = null, overviewPage = 1, devices = [], detailFilters = {}, detailPageSize = 100;
     function printReport(args) {
       window.open('/api/method/' + API + 'print_report?' + new URLSearchParams(args), '_blank', 'noopener');
     }
@@ -129,7 +129,7 @@
       const seq = ++request; selected = id; setHeading(true); root.classList.add("rfid-report-detail"); filters.hidden = true; info.hidden = true;
       content.replaceChildren(node('p','Đang tải chi tiết…'));
       try {
-        const data = await call('detail',{session_id:id,page:pageIndex,...appliedDetailFilters}); if(seq !== request) return;
+        const data = await call('detail',{session_id:id,page:pageIndex,page_size:detailPageSize,...appliedDetailFilters}); if(seq !== request) return;
         const header = node('div',undefined,'rfid-report-actions'); header.append(backButton(()=>overview(overviewPage)),refreshButton(()=>open(id,pageIndex)),printButton(()=>printReport({session_id:id,...appliedDetailFilters})));
         const session = data.session;
         const completed = session.status === 'Completed';
@@ -164,7 +164,14 @@
         if(!completed) content.append(node('p','Chưa đồng bộ dữ liệu scan. Số liệu và chi tiết RFID sẽ hiển thị sau khi phiên được hoàn thành.','rfid-detail-notice'));
         content.append(details);
         const records = node('section',undefined,'rfid-detail-card rfid-detail-records');
-        records.append(node('h4',`Chi tiết RFID · ${number.format(data.total)} dòng`));
+        const recordsHeading = node('div',undefined,'rfid-detail-records-heading');
+        recordsHeading.append(node('h4',`Chi tiết RFID · ${number.format(data.total)} dòng`));
+        const sizeLabel = node('label','Số dòng mỗi trang');
+        const sizeSelect = node('select',undefined,'form-control');sizeSelect.name='page_size';
+        [25,50,100,200,500].forEach(n=>option(sizeSelect,String(n),String(n)));
+        sizeSelect.value=String(detailPageSize);
+        sizeSelect.onchange=()=>{detailPageSize=Number(sizeSelect.value);open(id,1);};
+        sizeLabel.append(sizeSelect);recordsHeading.append(sizeLabel);records.append(recordsHeading);
         const detailForm = node('form',undefined,'rfid-detail-filters');
         const detailInputs = {};
         for (const [key,label] of [['booking','Booking'],['po','PO'],['box','Số thùng'],['item','Mã hàng'],['market','Mã thị trường'],['color','Mã màu'],['size','Tên size'],['metal','Rà kim']]) {

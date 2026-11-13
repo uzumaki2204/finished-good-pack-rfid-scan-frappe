@@ -162,6 +162,20 @@ class ReportingTests(unittest.TestCase):
         self.assertNotIn("PO-OLD", where)
         self.assertEqual(report.stored_orders('["P1", "P1", null, ""]'), {"P1"})
 
+    def test_detail_page_size_controls_server_offset_and_limit(self):
+        frappe.get_doc.return_value = record()
+        frappe.get_all.return_value = []
+        self.db.sql.return_value = []
+        self.db.count.return_value = 11712
+        for size in (25, 50, 100, 200, 500):
+            with patch.object(report, "summaries", return_value=[{}]):
+                result = report.detail("S1", page=2, page_size=size)
+            self.assertEqual(result["pageSize"], size)
+            self.assertEqual(frappe.get_all.call_args.kwargs["limit_start"], size)
+            self.assertEqual(frappe.get_all.call_args.kwargs["limit_page_length"], size)
+        for size in (0, -1, 1000, "all", "2.5"):
+            with self.assertRaises(ValueError): report.detail("S1", page_size=size)
+
     def test_photo_cursor_and_no_public_paths(self):
         frappe.get_doc.return_value=record()
         frappe.get_all.return_value=[types.SimpleNamespace(name=f"P{i}",original_name="a",width=1,height=1,byte_size=1,creation="now") for i in range(25)]

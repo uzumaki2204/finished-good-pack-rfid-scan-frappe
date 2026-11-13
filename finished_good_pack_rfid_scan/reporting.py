@@ -163,16 +163,19 @@ def overview(from_date=None, to_date=None, company=None, device=None, status=Non
 
 
 @frappe.whitelist(methods=["GET"])
-def detail(session_id, page=1, box=None, item=None, market=None, color=None, size=None, metal=None, booking=None, po=None):
+def detail(session_id, page=1, box=None, item=None, market=None, color=None, size=None, metal=None, booking=None, po=None, page_size=100):
     record = session_record(session_id)
+    page_size = page_number(page_size)
+    if page_size not in (25, 50, 100, 200, 500):
+        frappe.throw("Số dòng mỗi trang không hợp lệ.", frappe.ValidationError)
     page = page_number(page)
     filters = dict(box=box, item=item, market=market, color=color, size=size, metal=metal, booking=booking, po=po)
     where, args = detail_where(record.name, filters)
     total = frappe.db.sql(f"SELECT COUNT(*) FROM `tabRFID Scan Detail` WHERE {where}", args)[0][0] if any(v not in (None, "") for v in filters.values()) else frappe.db.count(service.SCAN, {"session": record.name})
     expressions = ", ".join(f"{expr} AS `{key}`" for key, expr in DETAIL_FILTERS.items())
     choices = frappe.db.sql(f"SELECT DISTINCT {expressions} FROM `tabRFID Scan Detail` WHERE session=%s", (record.name,), as_dict=True)
-    return {"session": summaries([record])[0], "items": scan_items(record.name, (page - 1) * 100, 100, filters),
-            "total": total, "page": page, "pageSize": 100,
+    return {"session": summaries([record])[0], "items": scan_items(record.name, (page - 1) * page_size, page_size, filters),
+            "total": total, "page": page, "pageSize": page_size,
             "filterOptions": {key: sorted({str(row[key]) for row in choices if row[key] not in (None, "")}) for key in DETAIL_FILTERS}}
 
 
