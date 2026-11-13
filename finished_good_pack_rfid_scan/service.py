@@ -441,7 +441,10 @@ def complete(device_id, session_id, vehicle, driver, note, scans):
             "disp_pack_num": scan.get("dispPackNum", ""),
             "is_metal_check": int(_metal(scan.get("isMetalCheck"))),
         }
-        scan_record.update(scan_storage.new_scan_fields(scan, scan_record))
+        try:
+            scan_record.update(scan_storage.new_scan_fields(scan, scan_record))
+        except (ValueError, TypeError, OverflowError) as error:
+            raise RfidError("error.scan_storage", reason=str(error)) from error
         saved_scan = frappe.get_doc(scan_record).insert(ignore_permissions=True)
         if scan_record.get("storage_version") == 1:
             persisted = frappe.get_all(SCAN, filters={"name":saved_scan.name}, fields=scan_storage.READ_FIELDS, limit_page_length=1)[0]
@@ -449,7 +452,7 @@ def complete(device_id, session_id, vehicle, driver, note, scans):
                 if scan_storage.dump(scan_storage.decode_scan(persisted)) != scan_storage.dump(scan):
                     raise ValueError("Persisted value mismatch")
             except (ValueError, TypeError) as error:
-                frappe.db.set_value(SCAN, saved_scan.name, {"payload":_json(scan),"storage_version":0,"storage_error":str(error)}, update_modified=False)
+                raise RfidError("error.scan_storage", reason=str(error)) from error
     session.vehicle_plate_number = text(vehicle)[:100]
     session.driver_full_name = text(driver)[:140]
     session.note = text(note)

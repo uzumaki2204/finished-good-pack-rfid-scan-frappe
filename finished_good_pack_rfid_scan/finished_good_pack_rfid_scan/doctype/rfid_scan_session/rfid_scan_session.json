@@ -14,8 +14,7 @@
       "fieldtype": "Data",
       "length": 36,
       "reqd": 1,
-      "unique": 1,
-      "read_only": 1
+      "unique": 1
     },
     {
       "fieldname": "company",
@@ -126,13 +125,15 @@
       "role": "System Manager",
       "read": 1,
       "report": 1,
-      "export": 1
+      "export": 1,
+      "write": 1
     },
     {
       "role": "RFID Scan Manager",
       "read": 1,
       "report": 1,
-      "export": 1
+      "export": 1,
+      "write": 1
     },
     {
       "role": "RFID Scan Operator",

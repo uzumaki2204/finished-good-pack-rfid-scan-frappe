@@ -19,7 +19,7 @@ FIELDS = {
 }
 BASE = {"detail_id", "rfid", "booking_id", "order_no", "do_no", "item_code", "disp_pack_num"}
 NEW_FIELDS = [v for v in FIELDS.values() if v not in BASE]
-READ_FIELDS = list(dict.fromkeys([*FIELDS.values(), "payload", "storage_version", "source_layout"]))
+READ_FIELDS = list(dict.fromkeys([*FIELDS.values(), "storage_version", "source_layout"]))
 
 
 def value(row, key, default=None):
@@ -31,10 +31,8 @@ def dump(data):
 
 
 def decode_scan(row):
-    if value(row, "payload"):
-        return json.loads(value(row, "payload"))
     if value(row, "storage_version") != 1:
-        raise ValueError("Missing scan snapshot and unsupported storage version")
+        raise ValueError("Unsupported scan storage version")
     layout = value(row, "source_layout", "") or ""
     if len(layout) != len(FIELDS):
         raise ValueError("Invalid source layout")
@@ -86,19 +84,35 @@ def encode_scan(data, row):
         if source_time != column_time and legacy_time != column_time:
             raise ValueError("Column conflict: scannedAtUtc")
     fields.update(storage_version=1, source_layout="".join(layout))
-    restored = decode_scan({**dict(row), **fields, "payload": None})
+    restored = decode_scan({**dict(row), **fields})
     if dump(restored) != dump(data): raise ValueError("Round-trip mismatch")
     return fields
 
 
 def new_scan_fields(data, row):
-    try:
-        return {**encode_scan(data,row), "payload": None}
-    except (ValueError, TypeError, OverflowError) as error:
-        # Never truncate or discard future ERP fields: retain the source until supported.
-        return {"payload": dump(data), "storage_version": 0, "storage_error": str(error)}
+    return encode_scan(data, row)
 
 
 def field_sql(key):
     field = FIELDS[key]
-    return f"CASE WHEN storage_version=1 THEN `{field}` ELSE NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.{key}')), 'null') END"
+    return f"`{field}`"
+
+
+def edited_scan_fields(previous, current):
+    """Keep the type/presence map consistent when a manager edits source columns."""
+    source = decode_scan(previous)
+    for key, field in FIELDS.items():
+        raw = value(current, field)
+        if raw == value(previous, field):
+            continue
+        old = source.get(key)
+        if raw in (None, ""):
+            source[key] = "" if isinstance(old, str) else None
+        elif type(old) in (int, float, bool):
+            parsed = json.loads(str(raw))
+            if type(parsed) is not type(old):
+                raise ValueError("Invalid source type: " + key)
+            source[key] = parsed
+        else:
+            source[key] = str(raw)
+    return source

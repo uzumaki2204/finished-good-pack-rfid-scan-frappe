@@ -107,179 +107,148 @@
       "default": "0"
     },
     {
-      "fieldname": "payload",
-      "label": "Scan Snapshot",
-      "fieldtype": "Long Text",
-      "reqd": 0,
-      "hidden": 1
-    },
-    {
       "fieldname": "source_scanned_at",
       "label": "Source Scanned At",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "source_metal_check",
       "label": "Source Metal Check",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "source_scan_id",
       "label": "Source Scan Id",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "booking_detail_id",
       "label": "Booking Detail Id",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "sku_code",
       "label": "Sku Code",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "sample_code",
       "label": "Sample Code",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "set_code",
       "label": "Set Code",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "market_code",
       "label": "Market Code",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "market_name",
       "label": "Market Name",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "market_id",
       "label": "Market Id",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "color_code",
       "label": "Color Code",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "color_name",
       "label": "Color Name",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "size_code",
       "label": "Size Code",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "size_name",
       "label": "Size Name",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "qty_per_set",
       "label": "Qty Per Set",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "source_quantity",
       "label": "Source Quantity",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "warehouse",
       "label": "Warehouse",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "ship_to_port_code",
       "label": "Ship To Port Code",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "ship_to_port",
       "label": "Ship To Port",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "inner_container_id",
       "label": "Inner Container Id",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "disp_container_id",
       "label": "Disp Container Id",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "display_booking_id",
       "label": "Display Booking Id",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "booking_request_no",
       "label": "Booking Request No",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "used_pack_num",
       "label": "Used Pack Num",
       "fieldtype": "Data",
-      "length": 255,
-      "read_only": 1
+      "length": 255
     },
     {
       "fieldname": "storage_version",
@@ -294,13 +263,6 @@
       "fieldtype": "Data",
       "read_only": 1,
       "hidden": 1
-    },
-    {
-      "fieldname": "storage_error",
-      "label": "Storage Conversion Error",
-      "fieldtype": "Small Text",
-      "read_only": 1,
-      "hidden": 1
     }
   ],
   "permissions": [
@@ -308,13 +270,15 @@
       "role": "System Manager",
       "read": 1,
       "report": 1,
-      "export": 1
+      "export": 1,
+      "write": 1
     },
     {
       "role": "RFID Scan Manager",
       "read": 1,
       "report": 1,
-      "export": 1
+      "export": 1,
+      "write": 1
     }
   ],
   "field_order": [
@@ -332,7 +296,6 @@
     "item_code",
     "disp_pack_num",
     "is_metal_check",
-    "payload",
     "source_scanned_at",
     "source_metal_check",
     "source_scan_id",
@@ -358,7 +321,6 @@
     "booking_request_no",
     "used_pack_num",
     "storage_version",
-    "source_layout",
-    "storage_error"
+    "source_layout"
   ]
 }

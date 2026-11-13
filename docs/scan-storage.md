@@ -1,3 +1,13 @@
+# Current storage (0.1.47)
+
+RFID Scan Detail uses explicit columns only. Scan Snapshot (`payload`) and Storage Conversion Error are removed from the DocType and physically dropped by migration. There is no JSON fallback. Unsupported input or a persisted round-trip mismatch rejects completion; the API rolls back the request.
+
+Existing rows must already have storage_version=1 before the column-drop patch runs. The patch refuses unconverted rows. Booking plan snapshots remain unchanged.
+
+System Manager and existing RFID Scan Manager permissions gain write access to their existing RFID DocTypes. Operator and Report Manager permissions remain unchanged. Visible source fields are editable; hidden storage metadata remains managed by code. Scan edits rebuild the source type map, normalize RFID, validate session ownership and update completed-session scan/metal totals. This does not enable Developer Mode or editing standard DocType definitions.
+
+The following sections are historical records only and describe superseded formats/tools.
+
 # RFID scan storage v1 (0.1.44)
 
 `RFID Scan Detail` stores source properties in explicit fields. `source_layout` is an append-only, position-based type/presence map defined by `scan_storage.FIELDS`: absent, null, string, integer, float, boolean remain distinct. `storage_version=1` identifies this representation. No ERP requests occur during conversion.

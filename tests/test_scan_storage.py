@@ -31,12 +31,11 @@ class ScanStorageTests(unittest.TestCase):
             self.assertEqual(actual["quantity"],value)
             self.assertNotIn("marketName",actual)
 
-    def test_unknown_nested_long_and_conflicts_keep_json(self):
+    def test_unknown_nested_long_and_conflicts_rejected(self):
         for changes in ({"unknownField":"keep me"},{"warehouse":"x"*256},{"quantity":{"nested":1}},{"rfid":"OTHER"},{"scannedAtUtc":"2026-11-13T09:00:00+07:00"},{"isMetalCheck":"N"}):
             source={**self.sample(),**changes}
-            fields=s.new_scan_fields(source,self.row())
-            self.assertEqual(fields["storage_version"],0)
-            self.assertEqual(json.loads(fields["payload"]),source)
+            with self.assertRaises(ValueError):
+                s.new_scan_fields(source,self.row())
 
     def test_legacy_local_time_column_and_source_milliseconds_both_survive(self):
         source=self.sample();row=self.row();row["scanned_at"]=datetime(2026,11,13,8,0,0)
@@ -50,7 +49,8 @@ class ScanStorageTests(unittest.TestCase):
 
     def test_legacy_payload_and_new_fields_produce_identical_response(self):
         source=self.sample();row=self.row();fields=s.encode_scan(source,row)
-        self.assertEqual(s.decode_scan({"payload":json.dumps(source)}),s.decode_scan({**row,**fields}))
+        with self.assertRaises(ValueError): s.decode_scan({"payload":json.dumps(source)})
+        self.assertEqual(source,s.decode_scan({**row,**fields}))
 
     def test_database_corruption_fails_verification(self):
         source=self.sample();row=self.row();fields=s.encode_scan(source,row)
@@ -59,8 +59,24 @@ class ScanStorageTests(unittest.TestCase):
 
     def test_filter_uses_columns_and_legacy_fallback(self):
         expression=s.field_sql("sampleCode")
-        self.assertIn("storage_version=1",expression)
+        self.assertNotIn("payload",expression)
         self.assertIn("`sample_code`",expression)
-        self.assertIn("$.sampleCode",expression)
+        self.assertEqual(expression,"`sample_code`")
+
+    def test_manager_edits_preserve_types_and_add_missing_fields(self):
+        row=self.row();row.update(s.encode_scan(self.sample(),row))
+        current={**row,"sample_code":"07999","market_name":"Việt Nam","source_quantity":"12"}
+        source=s.edited_scan_fields(row,current)
+        self.assertEqual(source["sampleCode"],"07999")
+        self.assertEqual(source["marketName"],"Việt Nam")
+        self.assertEqual(source["quantity"],12)
+        self.assertEqual(s.decode_scan({**current,**s.encode_scan(source,current)}),source)
+        with self.assertRaises(ValueError):
+            s.edited_scan_fields(row,{**row,"source_quantity":"not numeric"})
+
+    def test_new_scan_does_not_store_json(self):
+        fields=s.new_scan_fields(self.sample(),self.row())
+        self.assertNotIn("payload",fields)
+        self.assertNotIn("payload",s.READ_FIELDS)
 
 if __name__=="__main__":unittest.main()

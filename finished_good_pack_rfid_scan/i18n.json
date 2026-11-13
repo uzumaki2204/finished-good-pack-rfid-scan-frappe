@@ -190,7 +190,8 @@
     "error.photo_size": "Ảnh vượt giới hạn 20 MB hoặc 40 megapixel.",
     "error.photo_format": "Ảnh không hợp lệ. Chỉ hỗ trợ JPEG, PNG hoặc WebP tĩnh.",
     "error.photo_missing": "Không tìm thấy ảnh trong phiên này.",
-    "error.photo_deleted": "Ảnh của lượt tải này đã bị xóa. Vui lòng chọn ảnh lại."
+    "error.photo_deleted": "Ảnh của lượt tải này đã bị xóa. Vui lòng chọn ảnh lại.",
+    "error.scan_storage": "Không thể lưu đầy đủ dữ liệu RFID. Phiên chưa được hoàn thành. Chi tiết: {reason}"
   },
   "en": {
     "app.description": "Booking-based finished good RFID scanning for Frappe.",
@@ -383,6 +384,7 @@
     "error.photo_size": "Image exceeds 20 MB or 40 megapixels.",
     "error.photo_format": "Invalid image. Only static JPEG, PNG and WebP are supported.",
     "error.photo_missing": "Photo not found in this session.",
-    "error.photo_deleted": "This upload was deleted. Please select the photo again."
+    "error.photo_deleted": "This upload was deleted. Please select the photo again.",
+    "error.scan_storage": "RFID data could not be stored completely. The session was not completed. Details: {reason}"
   }
 }

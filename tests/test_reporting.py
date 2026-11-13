@@ -120,7 +120,7 @@ class ReportingTests(unittest.TestCase):
         self.db.count.return_value = 13868
         frappe.get_all.return_value = [types.SimpleNamespace(booking_id="B",order_no="PO",do_no="DO",item_code="I",
             disp_pack_num="00001",rfid="R",is_metal_check=1,scanned_at=datetime(2026,11,1),
-            payload=json.dumps({"usedPackNum":"OLD","setCode":"I055","sampleCode":"07217H060C","colorName":"BLUE"}))]
+            **report.scan_storage.encode_scan({"usedPackNum":"OLD","setCode":"I055","sampleCode":"07217H060C","colorName":"BLUE"},{}))]
         with patch.object(report,"summaries",return_value=[{"sessionId":"S1"}]):
             result=report.detail("S1",page=139)
         self.assertEqual(frappe.get_all.call_args.kwargs["limit_start"],13800)
@@ -133,9 +133,9 @@ class ReportingTests(unittest.TestCase):
     def test_detail_filters_use_bound_values_and_payload_codes(self):
         where, args = report.detail_where("S1", dict(box="00001", item="217H060C", market="07", color="X' OR 1=1", size="L", metal="Y", booking="B1", po="PO1"))
         self.assertNotIn(args["color"], where)
-        self.assertIn("$.sampleCode", where)
+        self.assertIn("`sample_code`", where)
         self.assertIn("SUBSTRING", where)
-        self.assertIn("$.sizeName", where)
+        self.assertIn("`size_name`", where)
         self.assertEqual(len(args), 9)
         self.assertIn("booking_id=%(booking)s", where)
         self.assertIn("order_no=%(po)s", where)

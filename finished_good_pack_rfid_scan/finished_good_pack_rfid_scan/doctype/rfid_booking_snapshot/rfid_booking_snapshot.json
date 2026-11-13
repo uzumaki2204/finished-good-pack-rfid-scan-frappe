@@ -63,12 +63,14 @@
     {
       "role": "System Manager",
       "read": 1,
-      "report": 1
+      "report": 1,
+      "write": 1
     },
     {
       "role": "RFID Scan Manager",
       "read": 1,
-      "report": 1
+      "report": 1,
+      "write": 1
     }
   ],
   "field_order": [
