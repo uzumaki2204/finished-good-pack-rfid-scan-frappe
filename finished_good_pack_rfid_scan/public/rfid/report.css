@@ -42,3 +42,6 @@
 .rfid-report-page-head .es-breadcrumbs__label,
 .rfid-report-page-head .title-text {font:700 clamp(18px,2.1vw,29.333px)/1.25 "Times New Roman",serif;color:#0070c0;text-align:center;white-space:normal;overflow:visible;text-overflow:clip;max-width:100%}
 .rfid-report-page-head .title-area {padding:12px 8px}
+
+.rfid-report.rfid-report-detail {padding-top:8px}
+.rfid-report-detail .rfid-report-actions {margin-top:0}
