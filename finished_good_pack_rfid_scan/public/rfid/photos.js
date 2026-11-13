@@ -107,7 +107,8 @@
           try { await api('delete_photo', { sessionId: requestedScope.sessionId, photoId: photo.id }, 'POST'); card.remove(); }
           catch (error) { $('photo-status').textContent = errorText(error); remove.disabled = false; }
         };
-        card.append(open, element('small', `${photo.width} × ${photo.height} · ${Math.ceil(photo.size / 1024)} KB`), remove);
+        card.append(open, element('small', `${photo.width} × ${photo.height} · ${Math.ceil(photo.size / 1024)} KB`));
+        if (result.canDelete) card.append(remove);
         $('photo-grid').append(card);
       }
       cursor = result.nextCursor; $('more-photos').hidden = !cursor;
@@ -120,8 +121,8 @@
     if (queue.length && !window.confirm(t('ui.photo_leave'))) return;
     queue = []; renderQueue(); $('photo-dialog').close();
   };
-  const open = async () => {
-    const current = context();
+  const open = async (selected = null) => {
+    const current = selected?.sessionId ? selected : context();
     if (!current.sessionId) return;
     scope = current; cursor = null; queue = []; $('photo-grid').replaceChildren(); renderQueue();
     $('photo-dialog').showModal(); await loadPhotos(true);
@@ -129,6 +130,31 @@
   window.RfidPhotos = {
     init(options) {
       ({ api, context } = options);
+      const browse = element('button', 'Hình ảnh các phiên cùng công ty', 'btn btn-default');
+      browse.type = 'button'; $('home-view').prepend(browse);
+      const picker = element('dialog', '', 'rfid-photo-dialog');
+      picker.style.cssText = 'width:min(720px,95vw);max-height:85vh;overflow:auto;padding:20px';
+      const title = element('h3', 'Hình ảnh các phiên cùng công ty');
+      const list = element('div'), footer = element('div');
+      const previous = element('button','Trang trước','btn btn-default'), next = element('button','Trang sau','btn btn-default'), closePicker = element('button','Đóng','btn btn-default');
+      let page = 1;
+      const loadSessions = async () => {
+        previous.disabled = next.disabled = true; list.textContent = 'Đang tải…';
+        try {
+          const result = await api('photo_sessions', {page}); list.replaceChildren();
+          if (!result.items.length) list.textContent = 'Chưa có phiên.';
+          for (const row of result.items) {
+            let bookings; try {bookings=JSON.parse(row.booking_ids_json || '[]').join(', ');} catch {bookings=row.name;}
+            const button = element('button', `${bookings || row.name} · ${row.status === 'Active' ? 'Đang scan' : 'Đã hoàn thành'} · ${row.device} · ${row.session_started_at}`, 'btn btn-default');
+            button.type='button'; button.style.cssText='display:block;width:100%;text-align:left;margin:8px 0;white-space:normal';
+            button.onclick = () => open({...context(),sessionId:row.name}); list.append(button);
+          }
+          previous.disabled = page <= 1; next.disabled = page*24 >= result.total;
+        } catch(error) {list.textContent=errorText(error);}
+      };
+      previous.onclick=()=>{page--;void loadSessions();}; next.onclick=()=>{page++;void loadSessions();};
+      closePicker.onclick=()=>picker.close(); footer.append(previous,next,closePicker); picker.append(title,list,footer); document.body.append(picker);
+      browse.onclick=()=>{page=1;picker.showModal();void loadSessions();};
       $('completion-photos').onclick = open; $('session-photos').onclick = open;
       $('choose-photos').onclick = () => { if (navigator.onLine) $('photo-files').click(); else status('ui.photo_network'); };
       $('take-photo').onclick = () => { if (navigator.onLine) $('photo-camera').click(); else status('ui.photo_network'); };

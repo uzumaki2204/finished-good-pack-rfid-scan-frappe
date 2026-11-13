@@ -83,7 +83,7 @@ class PhotoPolicyTest(unittest.TestCase):
         self.session = types.SimpleNamespace(name="S", company="C", device="D", status="Completed")
 
     def test_session_rejects_wrong_company_device_and_deleted(self):
-        for changes, status in [({"company": "OTHER"}, 404), ({"device": "OTHER"}, 403), ({"status": "Deleted"}, 404)]:
+        for changes, status in [({"company": "OTHER"}, 404), ({"status": "Deleted"}, 404)]:
             session = types.SimpleNamespace(**{**vars(self.session), **changes})
             with patch.object(photos, "approved_device", return_value=self.device), \
                  patch.object(service.frappe, "db", types.SimpleNamespace(exists=lambda *_: True), create=True), \
@@ -91,6 +91,19 @@ class PhotoPolicyTest(unittest.TestCase):
                 with self.assertRaises(RfidError) as error:
                     photos.authorize("D", "S")
             self.assertEqual(error.exception.status, status)
+
+    def test_other_approved_company_device_can_read_upload_but_not_delete(self):
+        self.session.device = "OTHER"
+        for status in ("Active", "Completed"):
+            self.session.status = status
+            with patch.object(photos, "approved_device", return_value=self.device), \
+                 patch.object(photos.frappe, "db", types.SimpleNamespace(exists=lambda *_: True, sql=lambda *_: None), create=True), \
+                 patch.object(photos.frappe, "get_doc", return_value=self.session, create=True):
+                self.assertEqual(photos.authorize("D", "S")[0], self.session)
+                with self.assertRaises(RfidError):
+                    photos.delete("D", "S", "P")
+                with self.assertRaises(RfidError):
+                    service._session("S", self.device)
 
     def test_unapproved_device_cannot_list(self):
         with patch.object(photos, "approved_device", side_effect=RfidError("error.device_pending", 403)):
@@ -170,7 +183,7 @@ class PhotoPolicyTest(unittest.TestCase):
 
     def test_page_has_24_items_and_no_file_paths(self):
         rows = [types.SimpleNamespace(name=f"P{25-i:03}", original_name="a", width=1, height=1, byte_size=10, creation="now") for i in range(25)]
-        with patch.object(photos, "authorize"), patch.object(photos.frappe, "get_all", return_value=rows, create=True):
+        with patch.object(photos, "authorize", return_value=(self.session,self.device)), patch.object(photos.frappe, "get_all", return_value=rows, create=True):
             result = photos.list_photos("D", "S")
         self.assertEqual(len(result["items"]), 24)
         self.assertEqual(result["nextCursor"], rows[23].name)
