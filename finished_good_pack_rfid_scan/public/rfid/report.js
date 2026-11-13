@@ -96,7 +96,7 @@
     filterActions.append(load,print); filters.append(filterActions);
     const info = node('p','','text-danger'); info.hidden = true;
     const content = node('section'); root.append(filters,info,content);
-    let request = 0, selected = null, overviewPage = 1, devices = [];
+    let request = 0, selected = null, overviewPage = 1, devices = [], detailFilters = {};
     function printReport(args) {
       window.open('/api/method/' + API + 'print_report?' + new URLSearchParams(args), '_blank', 'noopener');
     }
@@ -113,11 +113,13 @@
       } catch {if(seq === request) error(content,()=>overview(pageIndex));}
     }
     async function open(id,pageIndex=1) {
+      if (selected !== id) detailFilters = {};
+      const appliedDetailFilters = {...detailFilters};
       const seq = ++request; selected = id; setHeading(true); root.classList.add("rfid-report-detail"); filters.hidden = true; info.hidden = true;
       content.replaceChildren(node('p','Đang tải chi tiết…'));
       try {
-        const data = await call('detail',{session_id:id,page:pageIndex}); if(seq !== request) return;
-        const header = node('div',undefined,'rfid-report-actions'); header.append(backButton(()=>overview(overviewPage)),refreshButton(()=>open(id,pageIndex)),printButton(()=>printReport({session_id:id})));
+        const data = await call('detail',{session_id:id,page:pageIndex,...appliedDetailFilters}); if(seq !== request) return;
+        const header = node('div',undefined,'rfid-report-actions'); header.append(backButton(()=>overview(overviewPage)),refreshButton(()=>open(id,pageIndex)),printButton(()=>printReport({session_id:id,...appliedDetailFilters})));
         const session = data.session;
         const completed = session.status === 'Completed';
         const heading = node('div',undefined,'rfid-detail-heading');
@@ -152,8 +154,21 @@
         content.append(details);
         const records = node('section',undefined,'rfid-detail-card rfid-detail-records');
         records.append(node('h4',`Chi tiết RFID · ${number.format(data.total)} dòng`));
+        const detailForm = node('form',undefined,'rfid-detail-filters');
+        const detailInputs = {};
+        for (const [key,label] of [['box','Số thùng'],['item','Mã hàng'],['market','Mã thị trường'],['color','Mã màu'],['size','Tên size'],['metal','Rà kim']]) {
+          const wrap = node('label',label);const select = node('select',undefined,'form-control');
+          select.name = key;option(select,'Tất cả');
+          (data.filterOptions[key] || []).forEach(v=>option(select,key==='metal'?(v==='Y'?'Đã rà kim':'Chưa rà kim'):v,v));
+          if(appliedDetailFilters[key] && !(data.filterOptions[key] || []).includes(appliedDetailFilters[key])) option(select,appliedDetailFilters[key],appliedDetailFilters[key]);
+          select.value=appliedDetailFilters[key] || '';detailInputs[key]=select;wrap.append(select);detailForm.append(wrap);
+        }
+        const applyFilters = () => {detailFilters=Object.fromEntries(Object.entries(detailInputs).map(([k,el])=>[k,el.value]));open(id,1);};
+        const filterActions = node('div',undefined,'rfid-report-actions');
+        filterActions.append(button('Lọc',applyFilters,'btn btn-default rfid-report-action'),button('Xóa lọc',()=>{detailFilters={};open(id,1);},'btn btn-default rfid-report-action'));
+        detailForm.append(filterActions);detailForm.onsubmit=e=>{e.preventDefault();applyFilters();};records.append(detailForm);
         if(data.total) records.append(table(detailColumns,data.items),pager(data,p=>open(id,p)));
-        else records.append(node('p',completed?'Phiên này chưa có dữ liệu RFID.':'Phiên đang scan — chưa có chi tiết RFID trên máy chủ.','rfid-detail-empty'));
+        else records.append(node('p',Object.values(appliedDetailFilters).some(Boolean)?'Không có RFID phù hợp với bộ lọc.':completed?'Phiên này chưa có dữ liệu RFID.':'Phiên đang scan — chưa có chi tiết RFID trên máy chủ.','rfid-detail-empty'));
         content.append(records,photosSection);
         gallery(id,seq,grid,photoStatus);
       } catch {if(seq===request) {error(content,()=>open(id,pageIndex));content.prepend(backButton(()=>overview(overviewPage)));}}

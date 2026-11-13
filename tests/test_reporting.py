@@ -120,14 +120,36 @@ class ReportingTests(unittest.TestCase):
         self.db.count.return_value = 13868
         frappe.get_all.return_value = [types.SimpleNamespace(booking_id="B",order_no="PO",do_no="DO",item_code="I",
             disp_pack_num="00001",rfid="R",is_metal_check=1,scanned_at=datetime(2026,11,1),
-            payload=json.dumps({"usedPackNum":"I055","colorName":"BLUE"}))]
+            payload=json.dumps({"usedPackNum":"OLD","setCode":"I055","sampleCode":"07217H060C","colorName":"BLUE"}))]
         with patch.object(report,"summaries",return_value=[{"sessionId":"S1"}]):
             result=report.detail("S1",page=139)
         self.assertEqual(frappe.get_all.call_args.kwargs["limit_start"],13800)
         self.assertEqual(frappe.get_all.call_args.kwargs["limit_page_length"],100)
         self.assertEqual(result["items"][0]["boxCode"],"I055")
+        self.assertEqual(result["items"][0]["item"],"217H060C")
         self.assertIsNone(result["items"][0]["marketCode"])
         self.assertEqual(result["total"],13868)
+
+    def test_detail_filters_use_bound_values_and_payload_codes(self):
+        where, args = report.detail_where("S1", dict(box="00001", item="217H060C", market="07", color="X' OR 1=1", size="L", metal="Y"))
+        self.assertNotIn(args["color"], where)
+        self.assertIn("$.sampleCode", where)
+        self.assertIn("SUBSTRING", where)
+        self.assertIn("$.sizeName", where)
+        self.assertEqual(len(args), 7)
+        with self.assertRaises(ValueError): report.detail_where("S1", {"metal":"invalid"})
+
+    def test_filtered_count_and_pagination_use_same_conditions(self):
+        frappe.get_doc.return_value = record()
+        self.db.sql.side_effect = [[[201]], [], []]
+        with patch.object(report, "summaries", return_value=[{}]):
+            result = report.detail("S1", page=2, box="00001", item="217H060C", metal="N")
+        self.assertEqual(result["total"], 201)
+        calls = self.db.sql.call_args_list
+        for key in ("session", "box", "item", "metal"):
+            self.assertEqual(calls[0].args[1][key], calls[2].args[1][key])
+        self.assertEqual(calls[2].args[1]["offset"], 100)
+        self.assertEqual(calls[2].args[1]["limit"], 100)
 
     def test_photo_cursor_and_no_public_paths(self):
         frappe.get_doc.return_value=record()
@@ -177,7 +199,7 @@ class ReportingTests(unittest.TestCase):
             result=report.print_report(session_id="S1")
             self.assertIn("LAST-501",result["content"])
             self.assertIn("501 dòng",result["content"])
-            self.assertEqual(scans.call_args.args,("S1",500,500))
+            self.assertEqual(scans.call_args.args[:3],("S1",500,500))
             self.assertEqual(result["headers"]["Cache-Control"],"private, no-store")
             frappe.get_doc.return_value=record(status="Deleted")
             with self.assertRaises(LookupError):report.print_report(session_id="S1")

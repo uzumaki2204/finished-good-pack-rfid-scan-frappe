@@ -145,28 +145,60 @@ def overview(from_date=None, to_date=None, company=None, device=None, status=Non
 
 
 @frappe.whitelist(methods=["GET"])
-def detail(session_id, page=1):
+def detail(session_id, page=1, box=None, item=None, market=None, color=None, size=None, metal=None):
     record = session_record(session_id)
     page = page_number(page)
-    filters = {"session": record.name}
-    return {"session": summaries([record])[0], "items": scan_items(record.name, (page - 1) * 100, 100),
-            "total": frappe.db.count(service.SCAN, filters), "page": page, "pageSize": 100}
+    filters = dict(box=box, item=item, market=market, color=color, size=size, metal=metal)
+    where, args = detail_where(record.name, filters)
+    total = frappe.db.sql(f"SELECT COUNT(*) FROM `tabRFID Scan Detail` WHERE {where}", args)[0][0] if any(v not in (None, "") for v in filters.values()) else frappe.db.count(service.SCAN, {"session": record.name})
+    expressions = ", ".join(f"{expr} AS `{key}`" for key, expr in DETAIL_FILTERS.items())
+    choices = frappe.db.sql(f"SELECT DISTINCT {expressions} FROM `tabRFID Scan Detail` WHERE session=%s", (record.name,), as_dict=True)
+    return {"session": summaries([record])[0], "items": scan_items(record.name, (page - 1) * 100, 100, filters),
+            "total": total, "page": page, "pageSize": 100,
+            "filterOptions": {key: sorted({str(row[key]) for row in choices if row[key] not in (None, "")}) for key in DETAIL_FILTERS}}
 
 
-def scan_items(session_id, offset=0, limit=100):
+DETAIL_FILTERS = {
+    "box": "disp_pack_num",
+    "item": "SUBSTRING(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.sampleCode')), 'null'), 3)",
+    "market": "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.marketCode')), 'null')",
+    "color": "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.colorCode')), 'null')",
+    "size": "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.sizeName')), 'null')",
+    "metal": "CASE WHEN is_metal_check=1 THEN 'Y' ELSE 'N' END",
+}
+
+
+def detail_where(session_id, filters=None):
+    clauses, args = ["session=%(session)s"], {"session": session_id}
+    for field, value in (filters or {}).items():
+        if field not in DETAIL_FILTERS or value in (None, ""):
+            continue
+        if field == "metal" and value not in ("Y", "N"):
+            frappe.throw("Trạng thái rà kim không hợp lệ.", frappe.ValidationError)
+        clauses.append(f"{DETAIL_FILTERS[field]}=%({field})s")
+        args[field] = str(value)
+    return " AND ".join(clauses), args
+
+
+def scan_items(session_id, offset=0, limit=100, filters=None):
     """Use the same frozen scan mapping for Desk pages and full printed reports."""
-    rows = frappe.get_all(service.SCAN, filters={"session": session_id},
-                          fields=["booking_id", "order_no", "do_no", "item_code", "disp_pack_num", "rfid", "is_metal_check", "scanned_at", "payload"],
-                          order_by="scanned_at asc, name asc", limit_start=offset, limit_page_length=limit)
+    fields = ["booking_id", "order_no", "do_no", "item_code", "disp_pack_num", "rfid", "is_metal_check", "scanned_at", "payload"]
+    if any(v not in (None, "") for v in (filters or {}).values()):
+        where, args = detail_where(session_id, filters)
+        args.update(offset=offset, limit=limit)
+        rows = frappe.db.sql(f"SELECT {', '.join(fields)} FROM `tabRFID Scan Detail` WHERE {where} ORDER BY scanned_at asc, name asc LIMIT %(limit)s OFFSET %(offset)s", args, as_dict=True)
+    else:
+        rows = frappe.get_all(service.SCAN, filters={"session": session_id}, fields=fields,
+                             order_by="scanned_at asc, name asc", limit_start=offset, limit_page_length=limit)
     items = []
     for row in rows:
         payload = decode(row.payload, {})
         items.append({"booking": row.booking_id, "po": row.order_no, "do": row.do_no,
-            "item": row.item_code, "marketCode": payload.get("marketCode"), "marketName": payload.get("marketName"),
+            "item": (payload.get("sampleCode") or "")[2:], "marketCode": payload.get("marketCode"), "marketName": payload.get("marketName"),
             "colorCode": payload.get("colorCode"), "colorName": payload.get("colorName"),
             "sizeCode": payload.get("sizeCode"), "sizeName": payload.get("sizeName"),
             "metal": "Y" if row.is_metal_check else "N", "box": row.disp_pack_num,
-            "boxCode": payload.get("usedPackNum"), "rfid": row.rfid, "scannedAt": service._iso(row.scanned_at)})
+            "boxCode": payload.get("setCode"), "rfid": row.rfid, "scannedAt": service._iso(row.scanned_at)})
     return items
 
 
@@ -201,7 +233,7 @@ def photo_content(session_id, photo_id, thumbnail=None):
 
 @frappe.whitelist(methods=["GET"])
 def print_report(session_id=None, from_date=None, to_date=None, company=None, device=None,
-                 status=None, booking=None, po=None):
+                 status=None, booking=None, po=None, box=None, item=None, market=None, color=None, size=None, metal=None):
     """Authenticated print preview containing every matching row, never just the current page."""
     authorize()
     from finished_good_pack_rfid_scan.report_print import render
@@ -215,7 +247,7 @@ def print_report(session_id=None, from_date=None, to_date=None, company=None, de
         rows = []
         offset = 0
         while True:
-            batch = scan_items(record.name, offset, 500)
+            batch = scan_items(record.name, offset, 500, dict(box=box, item=item, market=market, color=color, size=size, metal=metal))
             rows.extend(batch)
             if len(batch) < 500:
                 break

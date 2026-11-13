@@ -79,3 +79,8 @@
  .rfid-detail-fields {grid-template-columns:90px minmax(0,1fr);gap:10px}
  .rfid-detail-card {padding:14px}
 }
+
+.rfid-detail-filters {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.rfid-detail-filters label {display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;margin:0}
+.rfid-detail-filters .rfid-report-actions {grid-column:1/-1;margin:0;justify-content:flex-end}
+@media(max-width:700px){.rfid-detail-filters {grid-template-columns:repeat(2,minmax(0,1fr))}}
