@@ -151,6 +151,15 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(calls[2].args[1]["offset"], 100)
         self.assertEqual(calls[2].args[1]["limit"], 100)
 
+    def test_po_fallback_uses_saved_details_and_legacy_summaries(self):
+        expression = report.stored_orders_sql("b.payload")
+        self.assertIn("$.summaryRows[*].orderNo", expression)
+        self.assertIn("$.items[*].orderNo", expression)
+        where, args = report.where_clause({"po": "PO-OLD"})
+        self.assertIn("d.order_no=%(po)s", where)
+        self.assertNotIn("PO-OLD", where)
+        self.assertEqual(report.stored_orders('["P1", "P1", null, ""]'), {"P1"})
+
     def test_photo_cursor_and_no_public_paths(self):
         frappe.get_doc.return_value=record()
         frappe.get_all.return_value=[types.SimpleNamespace(name=f"P{i}",original_name="a",width=1,height=1,byte_size=1,creation="now") for i in range(25)]

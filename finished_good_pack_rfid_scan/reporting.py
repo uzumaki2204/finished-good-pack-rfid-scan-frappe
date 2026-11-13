@@ -10,6 +10,19 @@ ROLES = {"System Manager", "RFID Report Manager"}
 VN = timezone(timedelta(hours=7))
 
 
+def stored_orders_sql(payload="payload"):
+    # Older/imported snapshots may omit orderNos but still contain PO-level summaries.
+    return "JSON_MERGE_PRESERVE(" + ", ".join(
+        f"COALESCE(JSON_EXTRACT({payload}, '$.{path}'), JSON_ARRAY())"
+        for path in ("orderNos", "items[*].orderNo", "summaryRows[*].orderNo")
+    ) + ")"
+
+
+def stored_orders(value):
+    return {str(po).strip() for po in decode(value, []) if po is not None and str(po).strip()}
+
+
+
 def can_open():
     return frappe.session.user != "Guest" and bool(ROLES.intersection(frappe.get_roles()))
 
@@ -71,7 +84,7 @@ def where_clause(filters):
         clauses.append("EXISTS (SELECT 1 FROM `tabRFID Booking Snapshot` b WHERE b.session=s.name AND b.booking_id=%(booking)s)")
         args["booking"] = filters["booking"]
     if filters.get("po"):
-        clauses.append("EXISTS (SELECT 1 FROM `tabRFID Booking Snapshot` b WHERE b.session=s.name AND JSON_CONTAINS(JSON_EXTRACT(b.payload, '$.orderNos'), JSON_QUOTE(%(po)s)))")
+        clauses.append(f"(EXISTS (SELECT 1 FROM `tabRFID Booking Snapshot` b WHERE b.session=s.name AND JSON_CONTAINS({stored_orders_sql('b.payload')}, JSON_QUOTE(%(po)s))) OR EXISTS (SELECT 1 FROM `tabRFID Scan Detail` d WHERE d.session=s.name AND d.order_no=%(po)s))")
         args["po"] = filters["po"]
     return " AND ".join(clauses), args
 
@@ -80,12 +93,14 @@ def summaries(rows):
     if not rows:
         return []
     names = tuple(row.name for row in rows)
-    plans = frappe.db.sql("""SELECT session, booking_id,
-        JSON_EXTRACT(payload, '$.orderNos') AS orders
-        FROM `tabRFID Booking Snapshot` WHERE session IN %(names)s""", {"names": names}, as_dict=True)
+    plans = frappe.db.sql(f"""SELECT session, booking_id,
+        {stored_orders_sql()} AS orders
+        FROM `tabRFID Booking Snapshot` WHERE session IN %(names)s
+        UNION SELECT session, booking_id, JSON_ARRAY(order_no) AS orders
+        FROM `tabRFID Scan Detail` WHERE session IN %(names)s AND COALESCE(order_no, '') != ''""", {"names": names}, as_dict=True)
     orders = {}
     for plan in plans:
-        orders.setdefault(plan.session, set()).update(decode(plan.orders, []))
+        orders.setdefault(plan.session, set()).update(stored_orders(plan.orders))
     # GROUP BY the full tuple; concatenating identifiers can collide or drop NULLs.
     boxes = frappe.db.sql("""SELECT session, COUNT(*) AS n FROM (
         SELECT session, booking_id, order_no, do_no, disp_pack_num
@@ -118,9 +133,12 @@ def options():
         FROM `tabRFID Scan Session` WHERE status IN ('Active', 'Completed')""", as_dict=True)
     company_ids = sorted({row.company for row in sessions if row.company})
     device_ids = sorted({row.device for row in sessions if row.device})
-    snapshots = frappe.db.sql("""SELECT DISTINCT b.booking_id, JSON_EXTRACT(b.payload, '$.orderNos') AS orders
+    snapshots = frappe.db.sql(f"""SELECT DISTINCT b.booking_id, {stored_orders_sql('b.payload')} AS orders
         FROM `tabRFID Booking Snapshot` b INNER JOIN `tabRFID Scan Session` s ON s.name=b.session
-        WHERE s.status IN ('Active', 'Completed')""", as_dict=True)
+        WHERE s.status IN ('Active', 'Completed')
+        UNION SELECT DISTINCT d.booking_id, JSON_ARRAY(d.order_no) AS orders
+        FROM `tabRFID Scan Detail` d INNER JOIN `tabRFID Scan Session` s ON s.name=d.session
+        WHERE s.status IN ('Active', 'Completed') AND COALESCE(d.order_no, '') != ''""", as_dict=True)
     return {
         "companies": frappe.get_all("Company", filters={"name": ["in", company_ids]},
             fields=["name", "company_name"], order_by="company_name") if company_ids else [],
@@ -128,7 +146,7 @@ def options():
             fields=["name", "device_name", "company"], order_by="device_name") if device_ids else [],
         "statuses": sorted({row.status for row in sessions}),
         "bookings": sorted({row.booking_id for row in snapshots if row.booking_id}),
-        "orders": sorted({po for row in snapshots for po in decode(row.orders, []) if po}),
+        "orders": sorted({po for row in snapshots for po in stored_orders(row.orders)}),
     }
 
 
