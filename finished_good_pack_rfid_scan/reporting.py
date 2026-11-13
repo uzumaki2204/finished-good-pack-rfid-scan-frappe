@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 import frappe
 
-from finished_good_pack_rfid_scan import photos, service
+from finished_good_pack_rfid_scan import photos, service, scan_storage
 
 ROLES = {"System Manager", "RFID Report Manager"}
 VN = timezone(timedelta(hours=7))
@@ -183,10 +183,10 @@ DETAIL_FILTERS = {
     "booking": "booking_id",
     "po": "order_no",
     "box": "disp_pack_num",
-    "item": "SUBSTRING(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.sampleCode')), 'null'), 3)",
-    "market": "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.marketCode')), 'null')",
-    "color": "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.colorCode')), 'null')",
-    "size": "NULLIF(JSON_UNQUOTE(JSON_EXTRACT(payload, '$.sizeName')), 'null')",
+    "item": f"SUBSTRING({scan_storage.field_sql('sampleCode')}, 3)",
+    "market": scan_storage.field_sql("marketCode"),
+    "color": scan_storage.field_sql("colorCode"),
+    "size": scan_storage.field_sql("sizeName"),
     "metal": "CASE WHEN is_metal_check=1 THEN 'Y' ELSE 'N' END",
 }
 
@@ -205,7 +205,7 @@ def detail_where(session_id, filters=None):
 
 def scan_items(session_id, offset=0, limit=100, filters=None):
     """Use the same frozen scan mapping for Desk pages and full printed reports."""
-    fields = ["booking_id", "order_no", "do_no", "item_code", "disp_pack_num", "rfid", "is_metal_check", "scanned_at", "payload"]
+    fields = list(dict.fromkeys([*scan_storage.READ_FIELDS, "is_metal_check", "scanned_at"]))
     if any(v not in (None, "") for v in (filters or {}).values()):
         where, args = detail_where(session_id, filters)
         args.update(offset=offset, limit=limit)
@@ -215,7 +215,7 @@ def scan_items(session_id, offset=0, limit=100, filters=None):
                              order_by="scanned_at asc, name asc", limit_start=offset, limit_page_length=limit)
     items = []
     for row in rows:
-        payload = decode(row.payload, {})
+        payload = scan_storage.decode_scan(row)
         items.append({"booking": row.booking_id, "po": row.order_no, "do": row.do_no,
             "item": (payload.get("sampleCode") or "")[2:], "marketCode": payload.get("marketCode"), "marketName": payload.get("marketName"),
             "colorCode": payload.get("colorCode"), "colorName": payload.get("colorName"),

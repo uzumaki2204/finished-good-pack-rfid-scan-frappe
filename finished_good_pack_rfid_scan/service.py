@@ -20,6 +20,7 @@ from finished_good_pack_rfid_scan.plan import (
     validate_scans,
 )
 from finished_good_pack_rfid_scan.soap import preload_booking
+from finished_good_pack_rfid_scan import scan_storage
 
 
 SESSION = "RFID Scan Session"
@@ -85,8 +86,8 @@ def _load_bookings(session_id):
 
 
 def _load_scans(session_id):
-    rows = frappe.db.get_all(SCAN, filters={"session": session_id}, fields=["payload"], order_by="scanned_at asc")
-    return [json.loads(row.payload) for row in rows]
+    rows = frappe.db.get_all(SCAN, filters={"session": session_id}, fields=scan_storage.READ_FIELDS, order_by="scanned_at asc")
+    return [scan_storage.decode_scan(row) for row in rows]
 
 
 def _save_snapshot(session, booking, backfill_only=False):
@@ -430,7 +431,7 @@ def complete(device_id, session_id, vehicle, driver, note, scans):
         if frappe.db.exists(SCAN, {"company": device.company, "normalized_rfid": normalized_rfid}):
             duplicate_count += 1
         detail_id = scan["finishedGoodPackDetailId"]
-        frappe.get_doc({
+        scan_record = {
             "doctype": SCAN, "scan_key": _hash(session_id, scan["bookingId"], detail_id),
             "session": session_id, "company": device.company, "device": device.name,
             "detail_id": detail_id, "rfid": scan["rfid"], "normalized_rfid": normalized_rfid,
@@ -439,8 +440,16 @@ def complete(device_id, session_id, vehicle, driver, note, scans):
             "do_no": scan.get("doNo", ""), "item_code": scan.get("itemCode", ""),
             "disp_pack_num": scan.get("dispPackNum", ""),
             "is_metal_check": int(_metal(scan.get("isMetalCheck"))),
-            "payload": _json(scan),
-        }).insert(ignore_permissions=True)
+        }
+        scan_record.update(scan_storage.new_scan_fields(scan, scan_record))
+        saved_scan = frappe.get_doc(scan_record).insert(ignore_permissions=True)
+        if scan_record.get("storage_version") == 1:
+            persisted = frappe.get_all(SCAN, filters={"name":saved_scan.name}, fields=scan_storage.READ_FIELDS, limit_page_length=1)[0]
+            try:
+                if scan_storage.dump(scan_storage.decode_scan(persisted)) != scan_storage.dump(scan):
+                    raise ValueError("Persisted value mismatch")
+            except (ValueError, TypeError) as error:
+                frappe.db.set_value(SCAN, saved_scan.name, {"payload":_json(scan),"storage_version":0,"storage_error":str(error)}, update_modified=False)
     session.vehicle_plate_number = text(vehicle)[:100]
     session.driver_full_name = text(driver)[:140]
     session.note = text(note)
