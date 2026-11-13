@@ -101,8 +101,6 @@ class PhotoPolicyTest(unittest.TestCase):
                  patch.object(photos.frappe, "get_doc", return_value=self.session, create=True):
                 self.assertEqual(photos.authorize("D", "S")[0], self.session)
                 with self.assertRaises(RfidError):
-                    photos.delete("D", "S", "P")
-                with self.assertRaises(RfidError):
                     service._session("S", self.device)
 
     def test_unapproved_device_cannot_list(self):
@@ -159,7 +157,7 @@ class PhotoPolicyTest(unittest.TestCase):
                 self.assertEqual(saved.format, "WEBP")
 
     def test_photo_id_from_another_session_rejected(self):
-        with patch.object(photos, "authorize"), \
+        with patch.object(photos, "authorize", return_value=(self.session,self.device)), \
              patch.object(photos.frappe, "db", types.SimpleNamespace(exists=lambda *_: True), create=True), \
              patch.object(photos.frappe, "get_doc", return_value=types.SimpleNamespace(session="OTHER", deleted=0), create=True):
             with self.assertRaises(RfidError):
@@ -171,7 +169,7 @@ class PhotoPolicyTest(unittest.TestCase):
         row = MagicMock(session="S", deleted=0, image_file="F1", thumbnail_file="F2")
         row.name = "P"
         file = types.SimpleNamespace(attached_to_doctype=photos.DOCTYPE, attached_to_name="P")
-        with patch.object(photos, "authorize"), \
+        with patch.object(photos, "authorize", return_value=(self.session,self.device)), \
              patch.object(photos.frappe, "db", types.SimpleNamespace(exists=lambda *_: True), create=True), \
              patch.object(photos.frappe, "get_doc", side_effect=[row, file, file], create=True), \
              patch.object(photos.frappe, "delete_doc", create=True) as delete:
@@ -182,12 +180,29 @@ class PhotoPolicyTest(unittest.TestCase):
             self.assertIsNone(row.thumbnail_file)
 
     def test_page_has_24_items_and_no_file_paths(self):
-        rows = [types.SimpleNamespace(name=f"P{25-i:03}", original_name="a", width=1, height=1, byte_size=10, creation="now") for i in range(25)]
+        rows = [types.SimpleNamespace(name=f"P{25-i:03}", device="D", original_name="a", width=1, height=1, byte_size=10, creation="now") for i in range(25)]
         with patch.object(photos, "authorize", return_value=(self.session,self.device)), patch.object(photos.frappe, "get_all", return_value=rows, create=True):
             result = photos.list_photos("D", "S")
         self.assertEqual(len(result["items"]), 24)
         self.assertEqual(result["nextCursor"], rows[23].name)
         self.assertNotIn("file_url", result["items"][0])
+
+    def test_delete_permission_per_photo(self):
+        self.session.device = "CREATOR"
+        for caller, allowed in [("CREATOR", True), ("UPLOADER", True), ("OTHER", False)]:
+            self.device.name = caller
+            row = MagicMock(session="S", device="UPLOADER", deleted=0, image_file=None, thumbnail_file=None)
+            row.name = "P"
+            with patch.object(photos, "authorize", return_value=(self.session,self.device)), \
+                 patch.object(photos.frappe, "db", types.SimpleNamespace(exists=lambda *_: True), create=True), \
+                 patch.object(photos.frappe, "get_doc", return_value=row, create=True), \
+                 patch.object(photos.frappe, "get_all", return_value=[row], create=True):
+                self.assertEqual(photos.list_photos(caller,"S")["items"][0]["canDelete"],allowed)
+                if allowed:
+                    self.assertTrue(photos.delete(caller,"S","P")["deleted"])
+                else:
+                    with self.assertRaises(RfidError): photos.delete(caller,"S","P")
+                    row.save.assert_not_called()
 
 
 if __name__ == "__main__":

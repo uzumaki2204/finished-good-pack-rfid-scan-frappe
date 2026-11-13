@@ -10,7 +10,6 @@ from finished_good_pack_rfid_scan.i18n import message
 
 
 READ = {
-    "photo_sessions": lambda d: photos.company_sessions(_device(d), d.get("page", 1)),
     "photos": lambda d: photos.list_photos(_device(d), d.get("sessionId"), d.get("before")),
     "device_check": lambda d: service.device_check(_device(d)),
     "active": lambda d: service.active_sessions(_device(d)),

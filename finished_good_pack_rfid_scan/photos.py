@@ -13,7 +13,7 @@ from finished_good_pack_rfid_scan.image_processing import optimize, MAX_BYTES
 DOCTYPE = "RFID Session Photo"
 
 
-def authorize(device_id, session_id, lock=False, owner_only=False):
+def authorize(device_id, session_id, lock=False):
     device = approved_device(device_id)
     if not isinstance(session_id, str) or not session_id or not frappe.db.exists(service.SESSION, session_id):
         raise RfidError("error.session_missing", 404)
@@ -22,21 +22,9 @@ def authorize(device_id, session_id, lock=False, owner_only=False):
     session = frappe.get_doc(service.SESSION, session_id)
     if session.company != device.company or session.status == "Deleted":
         raise RfidError("error.session_missing", 404)
-    if owner_only and session.device != device.name:
-        raise RfidError("error.device_session", 403)
     if session.status not in ("Active", "Completed"):
         raise RfidError("error.session_inactive", 403)
     return session, device
-
-
-def company_sessions(device_id, page=1):
-    device = approved_device(device_id)
-    page = max(1, int(page or 1))
-    filters = {"company": device.company, "status": ["in", ["Active", "Completed"]]}
-    rows = frappe.get_all(service.SESSION, filters=filters,
-        fields=["name", "booking_ids_json", "device", "status", "session_started_at"],
-        order_by="session_started_at desc, name desc", limit_start=(page-1)*24, limit_page_length=24)
-    return {"items": rows, "page": page, "total": frappe.db.count(service.SESSION, filters)}
 
 
 def public_photo(row):
@@ -50,9 +38,9 @@ def list_photos(device_id, session_id, before=None):
     if before:
         filters["name"] = ["<", str(before)]
     rows = frappe.get_all(DOCTYPE, filters=filters,
-                          fields=["name", "original_name", "width", "height", "byte_size", "creation"],
+                          fields=["name", "original_name", "width", "height", "byte_size", "creation", "device"],
                           order_by="name desc", limit_page_length=25)
-    return {"items": [public_photo(row) for row in rows[:24]], "canDelete": session.device == device.name,
+    return {"items": [{**public_photo(row), "canDelete": device.name in (session.device, row.device)} for row in rows[:24]],
             "nextCursor": rows[23].name if len(rows) > 24 else None}
 
 
@@ -109,12 +97,14 @@ def read(device_id, session_id, photo_id, thumbnail=False):
 
 def delete(device_id, session_id, photo_id):
     # Keep the request key as a tombstone: a delayed upload retry cannot recreate a deleted photo.
-    authorize(device_id, session_id, lock=True, owner_only=True)
+    session, device = authorize(device_id, session_id, lock=True)
     if not photo_id or not frappe.db.exists(DOCTYPE, photo_id):
         raise RfidError("error.photo_missing", 404)
     photo = frappe.get_doc(DOCTYPE, photo_id)
     if photo.session != session_id:
         raise RfidError("error.photo_missing", 404)
+    if device.name not in (session.device, photo.device):
+        raise RfidError("error.device_session", 403)
     if not photo.deleted:
         for file_id in (photo.image_file, photo.thumbnail_file):
             if file_id:
