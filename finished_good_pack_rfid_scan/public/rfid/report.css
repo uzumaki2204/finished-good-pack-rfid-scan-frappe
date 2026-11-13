@@ -45,3 +45,37 @@
 
 .rfid-report.rfid-report-detail {padding-top:8px}
 .rfid-report-detail .rfid-report-actions {margin-top:0}
+
+.rfid-detail-heading {display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 18px}
+.rfid-detail-eyebrow {font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--text-muted,#64748b)}
+.rfid-detail-heading h3 {margin:5px 0 0;font-size:21px;font-weight:700;overflow-wrap:anywhere}
+.rfid-status {display:inline-flex;align-items:center;gap:7px;flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.rfid-status::before {content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+.rfid-status.is-active {background:#fff3d6;color:#8a5700}
+.rfid-status.is-completed {background:#e6f7ee;color:#147a49}
+.rfid-detail-metrics {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.rfid-detail-metric {display:flex;flex-direction:column;gap:6px;padding:16px 18px;border:1px solid var(--border-color,#dce3e9);border-top:3px solid #1684bc;border-radius:10px;background:var(--fg-color,#fff)}
+.rfid-detail-metric > span {font-size:13px;font-weight:500;color:var(--text-muted,#64748b)}
+.rfid-detail-metric strong {font-size:28px;line-height:1.2;color:var(--text-color,#172633)}
+.rfid-detail-metric small {font-size:12px;color:var(--text-muted,#64748b)}
+.rfid-detail-info-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:16px 0}
+.rfid-detail-card {padding:18px;border:1px solid var(--border-color,#dce3e9);border-radius:10px;background:var(--fg-color,#fff);min-width:0}
+.rfid-detail-card h4 {font-size:15px;font-weight:650;margin:0 0 16px}
+.rfid-detail-fields {display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px 16px;margin:0;font-size:13px}
+.rfid-detail-fields dt {font-weight:400;color:var(--text-muted,#64748b)}
+.rfid-detail-fields dd {margin:0;font-weight:500;overflow-wrap:anywhere}
+.rfid-detail-notice {margin:0;padding:10px 14px;border-radius:8px;background:var(--subtle-fg,#f1f7fb);border-left:3px solid #1684bc;font-size:13px;color:var(--text-muted,#526579)}
+.rfid-detail-records {margin-top:16px}
+.rfid-detail-empty {font-size:13px;color:var(--text-muted,#64748b);margin:0;padding:8px 0}
+.rfid-detail-card .rfid-report-gallery:empty {margin:0}
+.rfid-report-detail .rfid-report-photos {margin-top:16px}
+@media(max-width:700px) {
+ .rfid-detail-info-grid {grid-template-columns:1fr}
+ .rfid-detail-metrics {gap:8px}
+ .rfid-detail-metric {padding:12px 10px}
+ .rfid-detail-metric strong {font-size:24px}
+ .rfid-detail-heading h3 {font-size:18px}
+ .rfid-detail-heading {align-items:flex-start;flex-wrap:wrap}
+ .rfid-detail-fields {grid-template-columns:90px minmax(0,1fr);gap:10px}
+ .rfid-detail-card {padding:14px}
+}

@@ -118,15 +118,43 @@
       try {
         const data = await call('detail',{session_id:id,page:pageIndex}); if(seq !== request) return;
         const header = node('div',undefined,'rfid-report-actions'); header.append(backButton(()=>overview(overviewPage)),refreshButton(()=>open(id,pageIndex)),printButton(()=>printReport({session_id:id})));
-        const title = node('h3',`Chi tiết phiên · ${data.session.bookingIds.join(', ')}`);
-        const summary = node('dl',undefined,'rfid-report-summary');
-        overviewColumns.forEach(([key,label,format])=>{summary.append(node('dt',label),node('dd',text(format?format(data.session[key]):data.session[key])));});
-        const photosSection = node('section',undefined,'rfid-report-photos');
-        const grid = node('div',undefined,'rfid-report-gallery'); const photoStatus = node('div');
+        const session = data.session;
+        const completed = session.status === 'Completed';
+        const heading = node('div',undefined,'rfid-detail-heading');
+        const headingText = node('div');
+        headingText.append(node('span','CHI TIẾT PHIÊN','rfid-detail-eyebrow'),node('h3',session.bookingIds.join(', ') || 'Phiên quét'));
+        heading.append(headingText,node('span',completed?'Đã hoàn thành':'Đang scan',`rfid-status ${completed?'is-completed':'is-active'}`));
+        const metrics = node('div',undefined,'rfid-detail-metrics');
+        const metric = (label,value,caption) => {
+          const card = node('div',undefined,'rfid-detail-metric');
+          card.append(node('span',label),node('strong',value),node('small',caption));metrics.append(card);
+        };
+        metric('Hàng đã scan',completed?number.format(session.scannedItems ?? 0):'—',`Kế hoạch: ${number.format(session.plannedItems ?? 0)} hàng`);
+        metric('Thùng đã scan',completed?number.format(session.scannedBoxes ?? 0):'—',`Kế hoạch: ${number.format(session.plannedBoxes ?? 0)} thùng`);
+        metric('Hàng đã rà kim',completed?number.format(session.metalChecked ?? 0):'—',completed?'Dữ liệu đã lưu trên máy chủ':'Chưa đồng bộ');
+        const details = node('div',undefined,'rfid-detail-info-grid');
+        const infoCard = (label,keys) => {
+          const card = node('section',undefined,'rfid-detail-card');
+          const list = node('dl',undefined,'rfid-detail-fields');
+          keys.forEach(key=>{
+            const [,label,format] = overviewColumns.find(c=>c[0]===key);
+            list.append(node('dt',label),node('dd',text(format?format(session[key]):session[key])));
+          });
+          card.append(node('h4',label),list);details.append(card);
+        };
+        infoCard('Thông tin chuyến hàng',['company','orderNos','bookingIds','vehicle','driver','note']);
+        infoCard('Thông tin phiên quét',['device','startedAt','completedAt','sessionId']);
+        const photosSection = node('section',undefined,'rfid-report-photos rfid-detail-card');
+        const grid = node('div',undefined,'rfid-report-gallery'); const photoStatus = node('div',undefined,'rfid-detail-empty');
         photosSection.append(node('h4','Hình ảnh'),grid,photoStatus);
-        content.replaceChildren(header,title,summary);
-        if(data.session.status === 'Active') content.append(node('p',pending + '. Các lượt quét được gửi lên máy chủ khi hoàn thành phiên.','alert alert-info'));
-        content.append(node('h4','Chi tiết RFID'),table(detailColumns,data.items),pager(data,p=>open(id,p)),photosSection);
+        content.replaceChildren(header,heading,metrics);
+        if(!completed) content.append(node('p','Chưa đồng bộ dữ liệu scan. Số liệu và chi tiết RFID sẽ hiển thị sau khi phiên được hoàn thành.','rfid-detail-notice'));
+        content.append(details);
+        const records = node('section',undefined,'rfid-detail-card rfid-detail-records');
+        records.append(node('h4',`Chi tiết RFID · ${number.format(data.total)} dòng`));
+        if(data.total) records.append(table(detailColumns,data.items),pager(data,p=>open(id,p)));
+        else records.append(node('p',completed?'Phiên này chưa có dữ liệu RFID.':'Phiên đang scan — chưa có chi tiết RFID trên máy chủ.','rfid-detail-empty'));
+        content.append(records,photosSection);
         gallery(id,seq,grid,photoStatus);
       } catch {if(seq===request) {error(content,()=>open(id,pageIndex));content.prepend(backButton(()=>overview(overviewPage)));}}
     }
