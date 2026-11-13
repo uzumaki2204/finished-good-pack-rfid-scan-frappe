@@ -102,7 +102,14 @@
     for (const row of rows) { const tr = document.createElement('tr'); for (const [, read] of columns) { const td = document.createElement('td'); const content = read(row); if (content instanceof Node) td.append(content); else td.textContent = String(content ?? ''); tr.append(td); } body.append(tr); }
     element.append(body); parent.append(element);
   };
-  const scansForSession = async () => state.session ? store.scans(state.session.sessionId) : [];
+  const scansForSession = async () => {
+    const session = state.session;
+    if (!session) return [];
+    const local = await store.scans(session.sessionId);
+    const merged = new Map(local.map(x => [x.bookingId+'|'+x.finishedGoodPackDetailId,x]));
+    for (const scan of session.scannedItems || []) merged.set(scan.bookingId+'|'+scan.finishedGoodPackDetailId,scan);
+    return [...merged.values()];
+  };
   const boxStatus = row => row.scanned === 0 ? 'not-scanned' : row.scanned < row.total ? 'scanning' : 'completed';
   const renderBoxList = () => {
     for (const button of document.querySelectorAll('[data-box-filter]')) {
@@ -552,15 +559,17 @@
     syncingScans = true;
     try {
       const id = session.sessionId;
+      const status = message => {if(state.session?.sessionId === id && state.session.sessionStatus === 'Active') syncStatus(message);};
       const acknowledged = scanAcknowledgements.get(id) || new Set();
       scanAcknowledgements.set(id, acknowledged);
       const scans = await store.scans(id);
       const pending = scans.filter(x=>!acknowledged.has(x.bookingId+'|'+x.finishedGoodPackDetailId)).slice(0,100);
-      if (!pending.length) {syncStatus('Đã đồng bộ các lượt quét trên thiết bị.');return;}
-      syncStatus('Đang đồng bộ lượt quét…');
+      if (!pending.length) {status('Đã đồng bộ các lượt quét trên thiết bị.');return;}
+      status('Đang đồng bộ lượt quét…');
       await api('sync_scans',{sessionId:id,scans:pending},'POST');
       pending.forEach(x=>acknowledged.add(x.bookingId+'|'+x.finishedGoodPackDetailId));
-    } catch (error) { syncStatus('Chưa đồng bộ thành công. Lượt quét vẫn lưu trên thiết bị và sẽ tự thử lại.'); }
+      status(scans.length > acknowledged.size ? 'Đã đồng bộ một phần. Đang tiếp tục gửi các lượt còn lại…' : 'Đã đồng bộ các lượt quét trên thiết bị.');
+    } catch (error) { if(state.session?.sessionId === session.sessionId && state.session.sessionStatus === 'Active') syncStatus('Chưa đồng bộ thành công. Lượt quét vẫn lưu trên thiết bị và sẽ tự thử lại.'); }
     finally { syncingScans = false; }
   };
   const addScan = async (rfid, sessionId, focusAfter = false) => {
