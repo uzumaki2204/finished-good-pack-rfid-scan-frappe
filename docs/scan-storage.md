@@ -52,3 +52,9 @@ The maintenance lock prevents concurrent runs. Exceptions roll back the current 
 - Rollback-only live scenario verified structured new writes, persisted source round trip, repeated completion without duplicate rows, and unknown-field JSON fallback. No test sessions retained.
 - Automated verification: 85 Python tests and 9 client refresh scenarios passed.
 - Maintenance progress and baseline comparisons remain in the `RFID Snapshot Migration` record `scan-storage-v1`.
+
+## 0.1.47 Dev verification (2026-11-13)
+
+Pilot update `20261113-070053-518f97` completed with backup and site migration. Confirmed `payload` is absent from both DocType metadata and the SQL table. All 150,414 currently stored scan rows decode successfully; the site contains 195 sessions and 195 Booking snapshots.
+
+Rollback-only live QA passed structured completion, duplicate completion idempotency, rejection of invalid RFID and unsupported ERP keys, preservation of unscanned plan items, filtered report reads, and ordinary Document.save() edits to sampleCode/setCode/market/metal status with session metal totals updated. Test transactions were rolled back. Automated checks: 81 Python tests plus client scan-queue and refresh scenarios passed.
