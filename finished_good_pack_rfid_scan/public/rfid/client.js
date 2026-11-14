@@ -574,38 +574,81 @@
     } catch (error) { if(state.session?.sessionId === session.sessionId && state.session.sessionStatus === 'Active') syncStatus('Chưa đồng bộ thành công. Lượt quét vẫn lưu trên thiết bị và sẽ tự thử lại.'); }
     finally { syncingScans = false; }
   };
-  const addScan = async (rfid, sessionId, focusAfter = false) => {
+  let scanLookupSession = null, scanLookupBookings = null, scanLookup = new Map();
+  let savedScanSession = null, savedRfids = new Set();
+  const pendingRfids = new Map();
+  const matchScan = rfid => {
+    const session = state.session;
+    if (scanLookupSession !== session || scanLookupBookings !== session?.preloadedBookings) {
+      scanLookupSession = session; scanLookupBookings = session?.preloadedBookings; scanLookup = new Map();
+      for (const booking of scanLookupBookings || []) for (const item of booking.items || []) {
+        const key = normalizedRfid(item.rfid);
+        if (!key) continue;
+        // null marks ambiguous RFID; never silently pick one matching item.
+        scanLookup.set(key, scanLookup.has(key) ? null : {booking,item});
+      }
+    }
+    return scanLookup.get(rfid);
+  };
+  let scanRenderTimer = null, scanRenderBusy = false, scanRenderRequested = null;
+  const scheduleScanRender = sessionId => {
+    scanRenderRequested = sessionId;
+    if (scanRenderTimer !== null || scanRenderBusy) return;
+    scanRenderTimer = window.setTimeout(async () => {
+      scanRenderTimer = null;
+      const requested = scanRenderRequested; scanRenderRequested = null;
+      if (state.session?.sessionId !== requested || state.completing || state.completionPending || $('session-view').hidden) return;
+      scanRenderBusy = true;
+      try { await renderSession(); }
+      catch { notice('error.offline_storage', 'danger'); }
+      finally { scanRenderBusy = false; if (scanRenderRequested) scheduleScanRender(scanRenderRequested); }
+    }, 150);
+  };
+  const addScan = async (rfid, sessionId, focusAfter = false, scannedAtUtc = new Date().toISOString()) => {
     if (state.session?.readOnly || !state.session || state.session.sessionId !== sessionId || state.session.sessionStatus !== 'Active'
       || state.completing || state.completionPending) return;
     const lookupRfid = normalizedRfid(rfid);
     if (!lookupRfid) return;
-    const bookings = state.session.preloadedBookings || [];
-    const matches = bookings.flatMap(b => (b.items || []).filter(x => normalizedRfid(x.rfid) === lookupRfid).map(item => ({ booking: b, item })));
-    if (!matches.length) return;
-    if (matches.length > 1) return notice('error.scan_ambiguous_in_plan', 'danger');
-    let scans;
-    try { scans = await scansForSession(); }
-    catch { return notice('error.offline_storage', 'danger'); }
-    if (state.session?.sessionId !== sessionId) return;
-    if (scans.some(x => normalizedRfid(x.rfid) === lookupRfid)) return;
-    const { booking, item } = matches[0];
+    const match = matchScan(lookupRfid);
+    if (match === undefined) return;
+    if (match === null) return notice('error.scan_ambiguous_in_plan', 'danger');
+    const session = state.session;
+    try {
+      if (savedScanSession !== session) {
+        const scans = await scansForSession();
+        if (state.session !== session) return;
+        savedRfids = new Set(scans.map(x => normalizedRfid(x.rfid))); savedScanSession = session;
+      }
+    } catch { return notice('error.offline_storage', 'danger'); }
+    if (savedRfids.has(lookupRfid)) return;
+    const { booking, item } = match;
     const scan = { bookingId: booking.bookingId, finishedGoodPackDetailId: item.finishedGoodPackDetailId,
-      rfid: item.rfid, orderNo: item.orderNo, doNo: item.doNo, dispPackNum: item.dispPackNum, scannedAtUtc: new Date().toISOString() };
+      rfid: item.rfid, orderNo: item.orderNo, doNo: item.doNo, dispPackNum: item.dispPackNum, scannedAtUtc };
     try {
       await store.put('scans', { key: `${sessionId}|${lookupRfid}`, sessionId, payload: scan });
+      if (savedScanSession === session) savedRfids.add(lookupRfid);
       if (state.session?.sessionId !== sessionId) return;
       const input = $('rfid-input');
       if (normalizedRfid(input.value) === lookupRfid) input.value = '';
       if (focusAfter) input.focus();
-      await renderSession();
+      scheduleScanRender(sessionId);
     } catch { notice('error.offline_storage', 'danger'); }
   };
   const canCaptureScans = () => !state.session?.readOnly && state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending && !state.scanPaused && !state.refreshing
     && !$('photo-dialog').open && !$('device-info-modal').open && !$('session-view').hidden && !$('scan-dock').hidden && $('item-detail-modal').hidden;
   const enqueueScan = (rfid, focusAfter = false, sessionId = state.session?.sessionId) => {
-    if (!sessionId) return Promise.resolve();
-    scanQueue = scanQueue.catch(() => {}).then(() => addScan(rfid, sessionId, focusAfter));
-    return scanQueue;
+    const session = state.session;
+    if (!sessionId || session?.sessionId !== sessionId || session.readOnly || session.sessionStatus !== 'Active' || state.completing || state.completionPending) return Promise.resolve();
+    const key = normalizedRfid(rfid);
+    // Reject unrelated tags before creating any queued work or reading IndexedDB.
+    if (!key || matchScan(key) === undefined || (savedScanSession === session && savedRfids.has(key))) return Promise.resolve();
+    const pendingKey = sessionId + '|' + key;
+    if (pendingRfids.has(pendingKey)) return pendingRfids.get(pendingKey);
+    const receivedAt = new Date().toISOString();
+    const work = scanQueue.catch(() => {}).then(() => addScan(key, sessionId, focusAfter, receivedAt))
+      .finally(() => {pendingRfids.delete(pendingKey);});
+    pendingRfids.set(pendingKey, work); scanQueue = work;
+    return work;
   };
   const clearScannerCommitTimer = () => {
     if (scannerCommitTimer !== null) window.clearTimeout(scannerCommitTimer);
@@ -641,11 +684,12 @@
     if (!canCaptureScans()) return;
     const raw = String(chunk || '');
     if (!raw) return;
-    const hasTerminator = /[\r\n\t]/.test(raw);
-    const sanitized = raw.replace(/[\r\n\t]+/g, '');
-    if (sanitized) $('rfid-input').value = `${$('rfid-input').value || ''}${sanitized}`;
-    if (hasTerminator) commitScannerInput();
-    else if (sanitized) queueScannerCommit();
+    const parts = raw.split(/[\r\n\t]/);
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i]) $('rfid-input').value = `${$('rfid-input').value || ''}${parts[i]}`;
+      if (i < parts.length - 1) commitScannerInput();
+    }
+    if (parts[parts.length - 1]) queueScannerCommit();
   };
   const shouldCaptureScannerKeys = event => {
     if (!canCaptureScans() || event.target === $('rfid-input')) return false;
