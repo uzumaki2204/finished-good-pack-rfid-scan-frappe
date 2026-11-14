@@ -393,9 +393,11 @@
     }
     plannedBoxTotal = Math.max(plannedBoxTotal, Number(s.plannedBoxCount || 0));
     const completedBoxCount = [...boxes.values()].filter(row => row.total > 0 && row.scanned >= row.total).length;
+    const actualBoxTotal = (s.preloadedBookings || []).reduce((total, booking) =>
+      total + Math.max(0, Number(booking.headerActualCartonCount ?? booking.plannedBoxCount ?? 0) || 0), 0);
     $('metric-scanned').textContent = formatCount(scans.length);
     $('metric-metal').textContent = formatCount(metalCount);
-    $('metric-boxes').textContent = `${formatCount(completedBoxCount)}/${formatCount(plannedBoxTotal)}`;
+    $('metric-boxes').textContent = `${formatCount(completedBoxCount)}/${formatCount(actualBoxTotal)}`;
     const progress = rows => [...rows.values()].map(row => ({ ...row, progress: `${row.scanned}/${row.total}` }));
     const poRows = [...po.entries()].map(([signature, row]) => {
       const boxKeys = poBoxKeys.get(signature) || new Set();
