@@ -11,10 +11,10 @@ function setup(n=1){
  let {ctx,calls,status,rows}=setup(101);
  await ctx.sync();assert.equal(calls[0][1].scans.length,100);
  await ctx.sync();assert.equal(calls[1][1].scans.length,1);
- await ctx.sync();assert.equal(calls.length,2);assert.equal(rows.length,101);
+ await ctx.sync();assert.equal(calls.length,2);assert.equal(rows.length,101);assert.equal(status.textContent,'');assert.equal(status.hidden,true);
  ({ctx,calls,status}=setup());ctx.api=async()=>{throw Error('lost response');};
  await ctx.sync();assert.match(status.textContent,/Chưa đồng bộ/);
- ctx.api=async(...args)=>calls.push(args);await ctx.sync();assert.equal(calls.length,1);
+ ctx.api=async(...args)=>calls.push(args);await ctx.sync();assert.equal(calls.length,1);assert.equal(status.textContent,'');assert.equal(status.hidden,true);
  ({ctx,calls}=setup());ctx.navigator.onLine=false;await ctx.sync();assert.equal(calls.length,0);
  ctx.navigator.onLine=true;ctx.state.completing=true;await ctx.sync();assert.equal(calls.length,0);
  ctx.state.completing=false;await Promise.all([ctx.sync(),ctx.sync()]);assert.equal(calls.length,1);

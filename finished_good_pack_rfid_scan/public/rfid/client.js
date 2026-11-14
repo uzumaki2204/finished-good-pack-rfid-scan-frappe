@@ -552,8 +552,9 @@
   const scanAcknowledgements = new Map();
   const syncStatus = message => {
     let el = document.getElementById('scan-sync-status');
+    if (!message) {if (el) {el.textContent = ''; el.hidden = true;} return;}
     if (!el) {el = document.createElement('p');el.id='scan-sync-status';el.setAttribute('role','status');$('session-view').prepend(el);}
-    el.textContent = message;
+    el.hidden = false; el.textContent = message;
   };
   const syncScans = async () => {
     const session = state.session;
@@ -566,11 +567,10 @@
       scanAcknowledgements.set(id, acknowledged);
       const scans = await store.scans(id);
       const pending = scans.filter(x=>!acknowledged.has(x.bookingId+'|'+x.finishedGoodPackDetailId)).slice(0,100);
-      if (!pending.length) {status('Đã đồng bộ các lượt quét trên thiết bị.');return;}
-      status('Đang đồng bộ lượt quét…');
+      if (!pending.length) {status('');return;}
       await api('sync_scans',{sessionId:id,scans:pending},'POST');
       pending.forEach(x=>acknowledged.add(x.bookingId+'|'+x.finishedGoodPackDetailId));
-      status(scans.length > acknowledged.size ? 'Đã đồng bộ một phần. Đang tiếp tục gửi các lượt còn lại…' : 'Đã đồng bộ các lượt quét trên thiết bị.');
+      status('');
     } catch (error) { if(state.session?.sessionId === session.sessionId && state.session.sessionStatus === 'Active') syncStatus('Chưa đồng bộ thành công. Lượt quét vẫn lưu trên thiết bị và sẽ tự thử lại.'); }
     finally { syncingScans = false; }
   };
@@ -581,13 +581,13 @@
     if (!lookupRfid) return;
     const bookings = state.session.preloadedBookings || [];
     const matches = bookings.flatMap(b => (b.items || []).filter(x => normalizedRfid(x.rfid) === lookupRfid).map(item => ({ booking: b, item })));
-    if (!matches.length) return notice('error.scan_not_in_plan', 'danger');
+    if (!matches.length) return;
     if (matches.length > 1) return notice('error.scan_ambiguous_in_plan', 'danger');
     let scans;
     try { scans = await scansForSession(); }
     catch { return notice('error.offline_storage', 'danger'); }
     if (state.session?.sessionId !== sessionId) return;
-    if (scans.some(x => normalizedRfid(x.rfid) === lookupRfid)) return notice('error.scan_duplicate', 'danger');
+    if (scans.some(x => normalizedRfid(x.rfid) === lookupRfid)) return;
     const { booking, item } = matches[0];
     const scan = { bookingId: booking.bookingId, finishedGoodPackDetailId: item.finishedGoodPackDetailId,
       rfid: item.rfid, orderNo: item.orderNo, doNo: item.doNo, dispPackNum: item.dispPackNum, scannedAtUtc: new Date().toISOString() };
@@ -597,7 +597,7 @@
       const input = $('rfid-input');
       if (normalizedRfid(input.value) === lookupRfid) input.value = '';
       if (focusAfter) input.focus();
-      notice('success.scan_saved', 'success'); await renderSession();
+      await renderSession();
     } catch { notice('error.offline_storage', 'danger'); }
   };
   const canCaptureScans = () => !state.session?.readOnly && state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending && !state.scanPaused && !state.refreshing
