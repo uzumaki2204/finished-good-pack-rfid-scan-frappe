@@ -27,7 +27,8 @@ WRITE = {
     "refresh_delta": lambda d: service.refresh_delta(_device(d), d.get("sessionId"), d.get("bookingId")),
     "rehydrate": lambda d: service.rehydrate(_device(d), d.get("sessionId")),
     "complete": lambda d: service.complete(_device(d), d.get("sessionId"), d.get("vehiclePlateNumber"),
-                                            d.get("driverFullName"), d.get("note"), d.get("scans")),
+                                            d.get("driverFullName"), d.get("note"), d.get("scans"),
+                                            compact=d.get("compactResult") is True),
     "delete": lambda d: service.delete_session(_device(d), d.get("sessionId")),
 }
 SUCCESS = {

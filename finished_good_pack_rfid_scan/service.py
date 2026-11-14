@@ -416,13 +416,99 @@ def rehydrate(device_id, session_id):
             "plannedBoxCount": sum(int(row.get("plannedBoxCount") or 0) for row in bookings)}
 
 
-def complete(device_id, session_id, vehicle, driver, note, scans, _finalize=True):
+def _scan_record(device, session_id, scan):
+    record = {
+        "doctype": SCAN, "scan_key": _hash(session_id, scan["bookingId"], scan["finishedGoodPackDetailId"]),
+        "session": session_id, "company": device.company, "device": device.name,
+        "detail_id": scan["finishedGoodPackDetailId"], "rfid": scan["rfid"],
+        "normalized_rfid": rfid_key(scan["rfid"]),
+        "scanned_at": datetime.fromisoformat(scan["scannedAtUtc"]).strftime("%Y-%m-%d %H:%M:%S.%f"),
+        "booking_id": scan["bookingId"], "order_no": scan.get("orderNo", ""),
+        "do_no": scan.get("doNo", ""), "item_code": scan.get("itemCode", ""),
+        "disp_pack_num": scan.get("dispPackNum", ""),
+        "is_metal_check": int(_metal(scan.get("isMetalCheck"))),
+    }
+    try:
+        record.update(scan_storage.new_scan_fields(scan, record))
+    except (ValueError, TypeError, OverflowError) as error:
+        raise RfidError("error.scan_storage", reason=str(error)) from error
+    return record
+
+
+def _insert_scans(device, session_id, scans):
+    saved = {}
+    for scan in scans:
+        record = _scan_record(device, session_id, scan)
+        name = frappe.get_doc(record).insert(ignore_permissions=True).name
+        if record.get("storage_version") == 1:
+            saved[name] = scan
+    if saved:
+        rows = frappe.db.get_all(SCAN, filters={"name": ["in", list(saved)]},
+                                 fields=["name", *scan_storage.READ_FIELDS], limit_page_length=0)
+        if len(rows) != len(saved):
+            raise RfidError("error.scan_storage", reason="Persisted row count mismatch")
+        for row in rows:
+            try:
+                if scan_storage.dump(scan_storage.decode_scan(row)) != scan_storage.dump(saved[row.name]):
+                    raise ValueError("Persisted value mismatch")
+            except (ValueError, TypeError, KeyError) as error:
+                raise RfidError("error.scan_storage", reason=str(error)) from error
+
+
+def _duplicate_rfids(device, session_id, scans):
+    keys = sorted({rfid_key(scan["rfid"]) for scan in scans})
+    duplicates = set()
+    for offset in range(0, len(keys), 500):
+        rows = frappe.db.get_all(SCAN, filters={"company": device.company,
+            "session": ["!=", session_id], "normalized_rfid": ["in", keys[offset:offset + 500]]},
+            fields=["normalized_rfid"], limit_page_length=0)
+        duplicates.update(row.normalized_rfid for row in rows)
+    return len(duplicates)
+
+
+def _sync_batch(device, session, scans, bookings):
+    resolved = validate_scans(scans, bookings)
+    # Keep inserts serialized with final cross-session duplicate counting.
+    frappe.db.sql("SELECT name FROM `tabCompany` WHERE name=%s FOR UPDATE", (device.company,))
+    names = [_hash(session.name, scan["bookingId"], scan["finishedGoodPackDetailId"]) for scan in resolved]
+    stored_rows = frappe.db.get_all(SCAN, filters={"name": ["in", names]},
+                                    fields=["name", "rfid"], limit_page_length=0)
+    stored = {row.name: row for row in stored_rows}
+    for scan, name in zip(resolved, names):
+        if name in stored and rfid_key(stored[name].rfid) != rfid_key(scan["rfid"]):
+            raise RfidError("error.scan_duplicate")
+    new = [scan for scan, name in zip(resolved, names) if name not in stored]
+    if new:
+        rfids = [rfid_key(scan["rfid"]) for scan in new]
+        rows = frappe.db.get_all(SCAN, filters={"session": session.name,
+            "normalized_rfid": ["in", rfids]}, fields=["name", "normalized_rfid"], limit_page_length=0)
+        if any(row.name not in names for row in rows):
+            raise RfidError("error.scan_duplicate")
+        _insert_scans(device, session.name, new)
+        session.total_scanned_count = int(session.total_scanned_count or 0) + len(new)
+        session.metal_checked_count = int(session.metal_checked_count or 0) + sum(
+            _metal(scan.get("isMetalCheck")) for scan in new)
+        session.save(ignore_permissions=True)
+    return {"sessionId": session.name, "syncedCount": int(session.total_scanned_count or 0)}
+
+
+def _compact_completed(session):
+    return {"sessionId": session.name, "sessionStatus": "Completed",
+            "sessionCompletedAtUtc": _iso(session.session_completed_at),
+            "vehiclePlateNumber": session.vehicle_plate_number or "",
+            "driverFullName": session.driver_full_name or "", "note": session.note or "",
+            "totalScannedCount": int(session.total_scanned_count or 0),
+            "metalCheckedCount": int(session.metal_checked_count or 0),
+            "crossSessionDuplicateCount": int(session.cross_session_duplicate_count or 0)}
+
+
+def complete(device_id, session_id, vehicle, driver, note, scans, _finalize=True, compact=False):
     device = approved_device(device_id)
     session = _session(session_id, device, lock=True)
     if session.status == "Completed":
         if not _finalize:
             raise RfidError("error.session_inactive")
-        return _details(session)
+        return _compact_completed(session) if compact else _details(session)
     if session.status != "Active":
         raise RfidError("error.session_inactive")
     if _finalize and (not text(vehicle) or not text(driver)):
@@ -430,10 +516,12 @@ def complete(device_id, session_id, vehicle, driver, note, scans, _finalize=True
     bookings = _load_bookings(session_id)
     if not bookings:
         raise RfidError("error.plan_missing")
-    stored = _load_scans(session_id)
-    merged = {(x["bookingId"], x["finishedGoodPackDetailId"]): x for x in stored}
     if not isinstance(scans, list):
         raise RfidError("error.scan_invalid")
+    if not _finalize:
+        return _sync_batch(device, session, scans, bookings)
+    stored = _load_scans(session_id)
+    merged = {(x["bookingId"], x["finishedGoodPackDetailId"]): x for x in stored}
     submitted_ids = set()
     for scan in scans:
         if not isinstance(scan,dict):
@@ -452,36 +540,9 @@ def complete(device_id, session_id, vehicle, driver, note, scans, _finalize=True
     # Serialize duplicate counting for sessions in the same company.
     frappe.db.sql("SELECT name FROM `tabCompany` WHERE name=%s FOR UPDATE", (device.company,))
     stored_ids = {(x["bookingId"],x["finishedGoodPackDetailId"]) for x in stored}
-    duplicate_count = 0
-    for scan in resolved:
-        normalized_rfid = rfid_key(scan["rfid"])
-        if frappe.db.exists(SCAN, {"company": device.company, "normalized_rfid": normalized_rfid,"session":["!=",session_id]}):
-            duplicate_count += 1
-        if (scan["bookingId"],scan["finishedGoodPackDetailId"]) in stored_ids:
-            continue
-        detail_id = scan["finishedGoodPackDetailId"]
-        scan_record = {
-            "doctype": SCAN, "scan_key": _hash(session_id, scan["bookingId"], detail_id),
-            "session": session_id, "company": device.company, "device": device.name,
-            "detail_id": detail_id, "rfid": scan["rfid"], "normalized_rfid": normalized_rfid,
-            "scanned_at": datetime.fromisoformat(scan["scannedAtUtc"]).strftime("%Y-%m-%d %H:%M:%S.%f"),
-            "booking_id": scan["bookingId"], "order_no": scan.get("orderNo", ""),
-            "do_no": scan.get("doNo", ""), "item_code": scan.get("itemCode", ""),
-            "disp_pack_num": scan.get("dispPackNum", ""),
-            "is_metal_check": int(_metal(scan.get("isMetalCheck"))),
-        }
-        try:
-            scan_record.update(scan_storage.new_scan_fields(scan, scan_record))
-        except (ValueError, TypeError, OverflowError) as error:
-            raise RfidError("error.scan_storage", reason=str(error)) from error
-        saved_scan = frappe.get_doc(scan_record).insert(ignore_permissions=True)
-        if scan_record.get("storage_version") == 1:
-            persisted = frappe.get_all(SCAN, filters={"name":saved_scan.name}, fields=scan_storage.READ_FIELDS, limit_page_length=1)[0]
-            try:
-                if scan_storage.dump(scan_storage.decode_scan(persisted)) != scan_storage.dump(scan):
-                    raise ValueError("Persisted value mismatch")
-            except (ValueError, TypeError) as error:
-                raise RfidError("error.scan_storage", reason=str(error)) from error
+    duplicate_count = _duplicate_rfids(device, session_id, resolved)
+    new = [scan for scan in resolved if (scan["bookingId"], scan["finishedGoodPackDetailId"]) not in stored_ids]
+    _insert_scans(device, session_id, new)
     if _finalize:
         session.vehicle_plate_number = text(vehicle)[:100]
         session.driver_full_name = text(driver)[:140]
@@ -493,11 +554,11 @@ def complete(device_id, session_id, vehicle, driver, note, scans, _finalize=True
     session.cross_session_duplicate_count = duplicate_count
     session.completion_hash = _hash(_json(sorted(resolved, key=lambda row: row["finishedGoodPackDetailId"])))
     session.save(ignore_permissions=True)
-    return _details(session) if _finalize else {"sessionId":session_id,"syncedCount":len(resolved)}
+    return _compact_completed(session) if compact else _details(session)
 
 
 def sync_scans(device_id, session_id, scans):
-    if not isinstance(scans,list) or not 1 <= len(scans) <= 100:
+    if not isinstance(scans,list) or not 1 <= len(scans) <= 500:
         raise RfidError("error.invalid_request")
     return complete(device_id, session_id, "", "", "", scans, _finalize=False)
 

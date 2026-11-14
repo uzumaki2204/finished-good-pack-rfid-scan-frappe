@@ -110,6 +110,14 @@
     for (const scan of session.scannedItems || []) merged.set(scan.bookingId+'|'+scan.finishedGoodPackDetailId,scan);
     return [...merged.values()];
   };
+  const pendingCompletionScans = (scans, session, acknowledged) => {
+    const stored = new Map((session.scannedItems || []).map(scan =>
+      [scan.bookingId+'|'+scan.finishedGoodPackDetailId, normalizedRfid(scan.rfid)]));
+    return scans.filter(scan => {
+      const identity = scan.bookingId+'|'+scan.finishedGoodPackDetailId;
+      return !acknowledged.has(identity) && stored.get(identity) !== normalizedRfid(scan.rfid);
+    });
+  };
   const boxStatus = row => row.scanned === 0 ? 'not-scanned' : row.scanned < row.total ? 'scanning' : 'completed';
   const renderBoxList = () => {
     for (const button of document.querySelectorAll('[data-box-filter]')) {
@@ -435,7 +443,12 @@
   const saveSession = async session => { state.session = session; await store.put('sessions', session); await store.put('meta', session.sessionId, 'currentSession'); await renderSession(); };
   const openSession = async sessionId => {
     resetSessionNavigation(); clearNotice();
-    try { await saveSession(await api('session', { sessionId })); return true; }
+    try {
+      const session = await api('session', { sessionId });
+      scanAcknowledgements.set(session.sessionId, new Set((session.scannedItems || []).map(scan =>
+        scan.bookingId+'|'+scan.finishedGoodPackDetailId)));
+      await saveSession(session); return true;
+    }
     catch (error) {
       if (!navigator.onLine) {
         try {
@@ -564,10 +577,13 @@
       const acknowledged = scanAcknowledgements.get(id) || new Set();
       scanAcknowledgements.set(id, acknowledged);
       const scans = await store.scans(id);
-      const pending = scans.filter(x=>!acknowledged.has(x.bookingId+'|'+x.finishedGoodPackDetailId)).slice(0,100);
-      if (!pending.length) return;
-      await api('sync_scans',{sessionId:id,scans:pending},'POST');
-      pending.forEach(x=>acknowledged.add(x.bookingId+'|'+x.finishedGoodPackDetailId));
+      const pending = scans.filter(x=>!acknowledged.has(x.bookingId+'|'+x.finishedGoodPackDetailId));
+      for (let offset = 0; offset < pending.length; offset += 500) {
+        if (!navigator.onLine || state.session?.sessionId !== id || state.completing || state.completionPending) break;
+        const batch = pending.slice(offset, offset + 500);
+        await api('sync_scans',{sessionId:id,scans:batch},'POST');
+        batch.forEach(x=>acknowledged.add(x.bookingId+'|'+x.finishedGoodPackDetailId));
+      }
     } catch { /* Keep local scans unacknowledged so the next background tick retries silently. */ }
     finally { syncingScans = false; }
   };
@@ -792,22 +808,38 @@
     state.completionPending = true;
     const pendingControls = ['confirm-completion', 'cancel-completion', 'completion-photos'];
     for (const id of pendingControls) $(id).disabled = true;
-    let total = 0;
+    let total = 0, uploaded = 0;
     try {
       if (!await window.RfidPhotos.prepareCompletion(state.session.sessionId)) return;
       const scans = await scansForSession();
       total = scans.length;
-      state.completionProgress = { phase: 'uploading', uploaded: 0, total };
+      const acknowledged = scanAcknowledgements.get(state.session.sessionId) || new Set();
+      const pending = pendingCompletionScans(scans, state.session, acknowledged);
+      uploaded = total - pending.length;
+      state.completionProgress = { phase: 'uploading', uploaded, total };
       renderCompletionProgress();
-      const session = await api('complete', { sessionId: state.session.sessionId, scans,
+      for (let offset = 0; offset < pending.length; offset += 500) {
+        const batch = pending.slice(offset, offset + 500);
+        try { await api('sync_scans', { sessionId: state.session.sessionId, scans: batch }, 'POST'); }
+        catch (error) {
+          if (error?.code === 'error.session_inactive') break;
+          throw error;
+        }
+        batch.forEach(scan => acknowledged.add(scan.bookingId+'|'+scan.finishedGoodPackDetailId));
+        scanAcknowledgements.set(state.session.sessionId, acknowledged);
+        uploaded += batch.length;
+        state.completionProgress = { phase: 'uploading', uploaded, total };
+        renderCompletionProgress();
+      }
+      const session = await api('complete', { sessionId: state.session.sessionId, scans: [], compactResult: true,
         vehiclePlateNumber, driverFullName, note: value('completion-note') }, 'POST');
-      const uploaded = Number(session.totalScannedCount ?? scans.length);
-      state.completionProgress = { phase: 'complete', uploaded, total: scans.length };
+      uploaded = Number(session.totalScannedCount ?? scans.length);
+      state.completionProgress = { phase: 'complete', uploaded, total };
       state.completing = false;
       lockCompletionNavigation(false);
       let cacheReady = true;
       try { await store.clearScans(session.sessionId); } catch { cacheReady = false; }
-      try { await store.put('sessions', session); } catch { cacheReady = false; }
+      try { await store.put('sessions', { ...state.session, ...session, scannedItems: scans }); } catch { cacheReady = false; }
       try { await store.remove('meta', 'currentSession'); } catch { cacheReady = false; }
       state.session = null;
       resetSessionNavigation();
@@ -816,7 +848,7 @@
         uploaded: formatCount(uploaded), total: formatCount(scans.length),
       });
     } catch (error) {
-      state.completionProgress = { phase: 'failed', uploaded: 0, total };
+      state.completionProgress = { phase: 'failed', uploaded, total };
       renderCompletionProgress();
       explain(error);
     }

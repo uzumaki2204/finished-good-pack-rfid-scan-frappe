@@ -8,10 +8,9 @@ function setup(n=1){
  vm.createContext(ctx);vm.runInContext(code,ctx);return {ctx,calls,status,rows};
 }
 (async()=>{
- let {ctx,calls,status,rows}=setup(101);
- await ctx.sync();assert.equal(calls[0][1].scans.length,100);
- await ctx.sync();assert.equal(calls[1][1].scans.length,1);
- await ctx.sync();assert.equal(calls.length,2);assert.equal(rows.length,101);assert.equal(status.textContent,'');
+ let {ctx,calls,status,rows}=setup(1001);
+ await ctx.sync();assert.deepEqual(calls.map(call=>call[1].scans.length),[500,500,1]);
+ await ctx.sync();assert.equal(calls.length,3);assert.equal(rows.length,1001);assert.equal(status.textContent,'');
  ({ctx,calls,status}=setup());ctx.api=async()=>{throw Error('lost response');};
  await ctx.sync();assert.equal(status.textContent,'');
  ctx.api=async(...args)=>calls.push(args);await ctx.sync();assert.equal(calls.length,1);assert.equal(status.textContent,'');
