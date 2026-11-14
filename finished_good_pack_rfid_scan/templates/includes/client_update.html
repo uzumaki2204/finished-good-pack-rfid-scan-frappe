@@ -1,0 +1,63 @@
+<script>
+// Inline so an older service worker cannot serve a cached updater script.
+(() => {
+  const current = {{ rfid_asset_version | tojson }};
+  let pending = null, checking = false, reloading = false, registration = null;
+  const safeToReload = () => {
+    const app = document.getElementById('rfid-app');
+    return navigator.onLine && !document.hidden && app &&
+      ['home-view', 'device-view'].includes(app.dataset.view) && !document.querySelector('dialog[open]');
+  };
+  const apply = async () => {
+    if (!pending || reloading || !safeToReload()) return;
+    // Never reload the same target repeatedly if a proxy/server is out of date.
+    try {if (sessionStorage.getItem('rfid-reload-target') === pending) return;} catch {}
+    reloading = true;
+    try {
+      if (registration) {
+        await registration.update();
+        const worker = registration.installing || registration.waiting;
+        if (worker && worker.state !== 'activated') {
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(Error('Update pending')), 20000);
+            worker.addEventListener('statechange', () => {
+              if (worker.state === 'activated') {clearTimeout(timer);resolve();}
+              if (worker.state === 'redundant') {clearTimeout(timer);reject(Error('Update failed'));}
+            });
+          });
+        }
+      }
+      if (window.RfidPrepareUpdate && !await window.RfidPrepareUpdate()) return;
+      if (!safeToReload()) return;
+      try {sessionStorage.setItem('rfid-reload-target', pending);} catch {}
+      window.location.reload();
+    } catch { /* Offline/incomplete installation: retain the working shell and retry. */ }
+    finally {reloading = false;}
+  };
+  const check = async () => {
+    if (checking || !navigator.onLine || document.hidden) return;
+    checking = true;
+    try {
+      const response = await fetch('/api/method/finished_good_pack_rfid_scan.api.client_version', {cache:'no-store'});
+      if (!response.ok) return;
+      const version = (await response.json()).message?.version;
+      if (typeof version === 'string' && version !== current) pending = version;
+      await apply();
+    } catch {} finally {checking = false;}
+  };
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController) {pending = pending || current + ':worker';void apply();}
+    });
+    navigator.serviceWorker.register('/finished-good-pack-rfid-scan-sw.js', {updateViaCache:'none'})
+      .then(reg => {registration = reg;return reg.update();}).catch(() => {});
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    try {if (sessionStorage.getItem('rfid-reload-target') === current) sessionStorage.removeItem('rfid-reload-target');} catch {}
+    void check(); setInterval(check, 60000); setInterval(() => {void apply();}, 3000);
+  });
+  window.addEventListener('online', check);
+  document.addEventListener('visibilitychange', () => {if (!document.hidden) void check();});
+})();
+</script>

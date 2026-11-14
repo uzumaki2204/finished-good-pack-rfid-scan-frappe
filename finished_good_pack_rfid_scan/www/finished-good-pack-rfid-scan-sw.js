@@ -1,46 +1,46 @@
-/* Same-origin tablet shell only. API and SOAP data are never service-worker cached. */
-const CACHE = 'finished-good-pack-rfid-scan-v28';
+/* Cache only this app shell. API data and IndexedDB are never touched. */
+const CACHE = 'finished-good-pack-rfid-scan-v29';
 const PAGE = '/finished-good-pack-rfid-scan';
-const ASSETS = [
-  PAGE,
-  '/assets/finished_good_pack_rfid_scan/rfid/photos.js',
-  '/assets/finished_good_pack_rfid_scan/rfid/scan.css',
-  '/assets/finished_good_pack_rfid_scan/rfid/logo.png',
-  '/assets/finished_good_pack_rfid_scan/rfid/i18n.js',
-  '/assets/finished_good_pack_rfid_scan/rfid/offline-store.js',
-  '/assets/finished_good_pack_rfid_scan/rfid/client.js',
-];
-self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
-});
+const fresh = url => fetch(url, {cache: 'no-store'});
+const assetUrl = value => {
+  try {const url = new URL(value, self.location.origin);return url.origin === self.location.origin && url.pathname.startsWith('/assets/') ? url.href : null;}
+  catch {return null;}
+};
+const cacheShell = async (extra = []) => {
+  const page = await fresh(PAGE);
+  if (!page.ok) throw Error('Shell unavailable');
+  const html = await page.clone().text();
+  const assets = [...new Set([...extra, ...Array.from(html.matchAll(/(?:src|href)=["']([^"']+)["']/g), m => m[1])].map(assetUrl).filter(Boolean))];
+  // Fetch the whole bundle before replacing the offline entry page.
+  const responses = await Promise.all(assets.map(async url => {
+    const response = await fresh(url);if (!response.ok) throw Error('Asset unavailable');return [url,response];
+  }));
+  const cache = await caches.open(CACHE);
+  await Promise.all(responses.map(([url,response]) => cache.put(url,response)));
+  await cache.put(PAGE,page);
+};
+self.addEventListener('install', event => {event.waitUntil(cacheShell().then(() => self.skipWaiting()));});
 self.addEventListener('activate', event => {
-  event.waitUntil(Promise.all([
-    caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('finished-good-pack-rfid-scan-') && key !== CACHE).map(key => caches.delete(key)))),
-    self.clients.claim(),
-  ]));
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('finished-good-pack-rfid-scan-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
 self.addEventListener('message', event => {
-  if (event.data?.type !== 'CACHE_SHELL' || !Array.isArray(event.data.assets)) return;
-  const assets = event.data.assets.filter(value => {
-    try { const url = new URL(value, self.location.origin); return url.origin === self.location.origin && url.pathname.startsWith('/assets/'); }
-    catch { return false; }
-  });
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(assets)));
+  if (event.data?.type === 'CACHE_SHELL' && Array.isArray(event.data.assets)) event.waitUntil(cacheShell(event.data.assets).catch(() => {}));
 });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin || event.request.method !== 'GET' || url.pathname.startsWith('/api/')) return;
-  if (event.request.mode === 'navigate' && url.pathname === PAGE) {
-    event.respondWith(fetch(event.request).then(response => {
-      if (response.ok) caches.open(CACHE).then(cache => cache.put(PAGE, response.clone()));
+  const navigation = event.request.mode === 'navigate' && url.pathname === PAGE;
+  if (!navigation && !url.pathname.startsWith('/assets/')) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    try {
+      const response = await fetch(event.request, {cache:'no-store'});
+      if (!response.ok) throw Error('Network response unavailable');
+      if (!navigation) await cache.put(event.request,response.clone());
       return response;
-    }).catch(() => caches.match(PAGE)));
-    return;
-  }
-  if (url.pathname.startsWith('/assets/')) {
-    event.respondWith(caches.match(event.request, { ignoreSearch: true }).then(cached => cached || fetch(event.request).then(response => {
-      if (response.ok) caches.open(CACHE).then(cache => cache.put(event.request, response.clone()));
-      return response;
-    })));
-  }
+    } catch {
+      // Exact URL, including version: never substitute another release's JS/CSS.
+      return await cache.match(navigation ? PAGE : event.request) || new Response('Offline asset unavailable', {status:503});
+    }
+  })());
 });

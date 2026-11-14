@@ -1046,11 +1046,17 @@
       } else views('device-view');
     } catch (error) { state.device = null; views('device-view'); explain(error); }
     if ('serviceWorker' in navigator && window.isSecureContext) {
-      navigator.serviceWorker.register('/finished-good-pack-rfid-scan-sw.js').then(() => navigator.serviceWorker.ready).then(registration => {
-        const assets = [...document.querySelectorAll('link[rel="stylesheet"]')].map(link => link.href);
+      navigator.serviceWorker.register('/finished-good-pack-rfid-scan-sw.js', {updateViaCache: 'none'}).then(() => navigator.serviceWorker.ready).then(registration => {
+        const assets = [...document.querySelectorAll('link[rel="stylesheet"], script[src]')].map(el => el.href || el.src);
         registration.active?.postMessage({ type: 'CACHE_SHELL', assets });
       }).catch(() => {});
     }
+  };
+  window.RfidPrepareUpdate = async () => {
+    await scanQueue;
+    return !state.completing && !state.completionPending && !syncingScans && !state.refreshRequest
+      && !$('start-session').disabled && !$('photo-dialog').open
+      && !state.bookingIds.length && !value('booking-entry');
   };
   document.addEventListener('DOMContentLoaded', init);
 })();

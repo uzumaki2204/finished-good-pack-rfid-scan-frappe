@@ -1,6 +1,7 @@
 """Tablet route backed by Frappe's standard Desk style."""
 
 from pathlib import Path
+import hashlib
 
 import frappe
 
@@ -9,6 +10,19 @@ from finished_good_pack_rfid_scan.i18n import catalog, message
 
 
 ROUTE = "finished-good-pack-rfid-scan"
+
+
+def asset_version():
+    root = Path(__file__).parent
+    digest = hashlib.sha256()
+    paths = sorted((root / "public" / "rfid").glob("*"))
+    paths += sorted((root / "templates").rglob("*.html"))
+    paths += [root / "i18n.json", root / "www" / "finished-good-pack-rfid-scan-sw.js"]
+    for path in paths:
+        if path.is_file():
+            digest.update(str(path.relative_to(root)).encode())
+            digest.update(path.read_bytes())
+    return __version__ + "-" + digest.hexdigest()[:16]
 
 
 def check_route():
@@ -45,7 +59,7 @@ def update_website_context(context):
     language = str(frappe.form_dict.get("lang") or "vi").split("-")[0]
     context.rfid_language = language if language in catalog() else "vi"
     context.rfid_catalog = catalog()
-    context.rfid_asset_version = __version__
+    context.rfid_asset_version = asset_version()
     head = frappe.get_template(
         "finished_good_pack_rfid_scan/templates/includes/tablet_head.html"
     ).render(context)

@@ -135,3 +135,11 @@ def photo_content(deviceId=None, sessionId=None, photoId=None, thumbnail=None):
             "Content-Disposition": 'inline; filename="rfid-photo.webp"',
         })
     return _photo_response(run)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def client_version():
+    """Public build identity only; never return session or device data."""
+    from finished_good_pack_rfid_scan.web_page import asset_version
+    frappe.local.response.setdefault("headers", {})["Cache-Control"] = "no-store"
+    return {"version": asset_version()}
