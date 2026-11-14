@@ -550,28 +550,20 @@
   };
   let syncingScans = false;
   const scanAcknowledgements = new Map();
-  const syncStatus = message => {
-    let el = document.getElementById('scan-sync-status');
-    if (!message) {if (el) {el.textContent = ''; el.hidden = true;} return;}
-    if (!el) {el = document.createElement('p');el.id='scan-sync-status';el.setAttribute('role','status');$('session-view').prepend(el);}
-    el.hidden = false; el.textContent = message;
-  };
   const syncScans = async () => {
     const session = state.session;
     if (session?.readOnly || syncingScans || !navigator.onLine || session?.sessionStatus !== 'Active' || state.completing || state.completionPending) return;
     syncingScans = true;
     try {
       const id = session.sessionId;
-      const status = message => {if(state.session?.sessionId === id && state.session.sessionStatus === 'Active') syncStatus(message);};
       const acknowledged = scanAcknowledgements.get(id) || new Set();
       scanAcknowledgements.set(id, acknowledged);
       const scans = await store.scans(id);
       const pending = scans.filter(x=>!acknowledged.has(x.bookingId+'|'+x.finishedGoodPackDetailId)).slice(0,100);
-      if (!pending.length) {status('');return;}
+      if (!pending.length) return;
       await api('sync_scans',{sessionId:id,scans:pending},'POST');
       pending.forEach(x=>acknowledged.add(x.bookingId+'|'+x.finishedGoodPackDetailId));
-      status('');
-    } catch (error) { if(state.session?.sessionId === session.sessionId && state.session.sessionStatus === 'Active') syncStatus('Chưa đồng bộ thành công. Lượt quét vẫn lưu trên thiết bị và sẽ tự thử lại.'); }
+    } catch { /* Keep local scans unacknowledged so the next background tick retries silently. */ }
     finally { syncingScans = false; }
   };
   let scanLookupSession = null, scanLookupBookings = null, scanLookup = new Map();
