@@ -131,13 +131,25 @@ def _update_counts(session, bookings):
 
 def _card(session, bookings=None, scans=None):
     bookings = bookings if bookings is not None else _load_bookings(session.name)
-    scans = scans if scans is not None else _load_scans(session.name)
     planned_boxes = sum(int(booking.get("plannedBoxCount") or 0) for booking in bookings) if bookings else int(session.planned_box_count or 0)
-    history_orders = {order for booking in bookings for order in booking.get("orderNos", [])} or {scan.get("orderNo") for scan in scans if scan.get("orderNo")}
-    scanned_boxes = len({
-        (scan.get("bookingId"), scan.get("orderNo"), scan.get("doNo"), scan.get("dispPackNum"))
-        for scan in scans if scan.get("dispPackNum")
-    })
+    history_orders = {order for booking in bookings for order in booking.get("orderNos", [])}
+    if scans is None:
+        # Cards need counts only; decoding every saved RFID makes the home screen slow.
+        scanned_boxes = frappe.db.sql("""SELECT COUNT(*) FROM (
+            SELECT 1 FROM `tabRFID Scan Detail` WHERE session=%s
+              AND disp_pack_num IS NOT NULL AND disp_pack_num != ''
+            GROUP BY booking_id, order_no, do_no, disp_pack_num
+        ) AS scanned_boxes""", (session.name,))[0][0]
+        if not history_orders:
+            history_orders = {row.order_no for row in frappe.db.sql(
+                "SELECT DISTINCT order_no FROM `tabRFID Scan Detail` WHERE session=%s AND order_no IS NOT NULL AND order_no != ''",
+                (session.name,), as_dict=True)}
+    else:
+        history_orders = history_orders or {scan.get("orderNo") for scan in scans if scan.get("orderNo")}
+        scanned_boxes = len({
+            (scan.get("bookingId"), scan.get("orderNo"), scan.get("doNo"), scan.get("dispPackNum"))
+            for scan in scans if scan.get("dispPackNum")
+        })
     warnings = [warning for booking in bookings for warning in booking.get("planningWarnings", [])]
     return {
         "sessionId": session.name,

@@ -148,6 +148,24 @@ class ServicePolicyTest(unittest.TestCase):
         self.assertEqual(len(queries), 9)
         self.assertTrue(all(len(chunk) <= 500 for chunk in queries))
 
+    def test_home_card_counts_boxes_without_loading_rfid_rows(self):
+        session = types.SimpleNamespace(name="SESSION-1", status="Completed", company=self.device.company,
+            device=self.device.name, vehicle_plate_number="", driver_full_name="", note="",
+            session_started_at=None, session_completed_at=None, total_scanned_count=4500,
+            metal_checked_count=4500, cross_session_duplicate_count=0, planned_item_count=5000,
+            planned_box_count=600)
+        calls = []
+        def sql(query, params, **_):
+            calls.append((query, params))
+            return [(540,)]
+        db = types.SimpleNamespace(sql=sql, get_value=lambda *_: None)
+        with patch.object(service.frappe, "db", db, create=True), \
+             patch.object(service, "_load_scans", side_effect=AssertionError("Full RFID read")):
+            card = service._card(session, [fixture()])
+        self.assertEqual(card["boxScannedCount"], 540)
+        self.assertEqual(card["totalScannedCount"], 4500)
+        self.assertEqual(len(calls), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
