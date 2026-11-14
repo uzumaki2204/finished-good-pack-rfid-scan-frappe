@@ -45,5 +45,14 @@ function setup(){
  vm.runInContext(source.slice(source.indexOf('  const clearScannerCommitTimer ='),source.indexOf('  const shouldCaptureScannerKeys ='))+'\nglobalThis.append=appendScannerText;',ctx);
  ctx.append('OUTSIDE\r\nABC123\tOUTSIDE2\nABC123\n');await ctx.scanQueue;
  assert.equal(scans.length,1);assert.equal(notices.length,0);assert.equal(ctx.$('rfid-input').value,'');
+ // A hardware scanner must work while a non-editable page element has focus.
+ assert.match(fs.readFileSync('finished_good_pack_rfid_scan/web_page.html','utf8'),/id="rfid-input"[^>]*inputmode="none"/);
+ ({ctx,scans,notices}=setup());const scanElements=new Map();
+ ctx.$=id=>{if(!scanElements.has(id))scanElements.set(id,{value:'',hidden:id==='item-detail-modal',open:false});return scanElements.get(id);};
+ ctx.window.clearTimeout=()=>{};ctx.HTMLElement=class HTMLElement{};
+ vm.runInContext('let scannerCommitTimer=null,lastFocusedRfidKeyAt=0,focusedRfidKeyBurst=0;const SCAN_COMMIT_DELAY_MS=60;'+source.slice(source.indexOf('  const clearScannerCommitTimer ='),source.indexOf('  const beginCompletion ='))+'\nglobalThis.scannerKey=handleScannerKeyDown;',ctx);
+ for(const key of 'ABC123')ctx.scannerKey({target:{},key,ctrlKey:false,altKey:false,metaKey:false,isComposing:false,preventDefault(){},stopPropagation(){}});
+ ctx.scannerKey({target:{},key:'Enter',preventDefault(){},stopPropagation(){}});
+ await ctx.scanQueue;assert.equal(scans.length,1);assert.equal(ctx.$('rfid-input').value,'');
  console.log('Client scan queue: valid scan, duplicate, unknown RFID, completion guard and storage failure passed');
 })().catch(e=>{console.error(e);process.exit(1)});

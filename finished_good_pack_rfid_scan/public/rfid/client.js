@@ -265,7 +265,8 @@
     const s = state.session;
     if (!s) return;
     closeItemDetail();
-    if (state.renderedSessionId !== s.sessionId) {
+    const firstRender = state.renderedSessionId !== s.sessionId;
+    if (firstRender) {
       state.renderedSessionId = s.sessionId; state.scanPaused = false; state.boxScope = null; renderScanMode();
       state.activeSessionTab = 'po'; state.activeBoxFilter = 'not-scanned'; state.boxSearch = ''; state.completing = false; state.completionProgress = null;
       $('box-search').value = '';
@@ -419,6 +420,8 @@
     $('tab-items-count').textContent = String(state.sessionRows.items.length);
     for (const filter of BOX_FILTERS) $('box-' + filter + '-count').textContent = String(state.sessionRows.boxes.filter(row => boxStatus(row) === filter).length);
     selectSessionTab(state.activeSessionTab);
+    // Android keyboard-wedge readers need a focused input; inputmode=none hides the soft keyboard.
+    if (firstRender && editable && !state.scanPaused) $('rfid-input').focus({preventScroll: true});
     return storageReady;
   };
   const resetSessionNavigation = () => {
@@ -1020,6 +1023,9 @@
     document.addEventListener('keydown', handleScannerKeyDown);
     document.addEventListener('beforeinput', handleScannerBeforeInput);
     document.addEventListener('paste', handleScannerPaste);
+    // A deliberate tap still permits manual entry; hardware scanning keeps the keyboard hidden.
+    $('rfid-input').addEventListener('pointerdown', () => { $('rfid-input').inputMode = 'text'; });
+    $('rfid-input').addEventListener('blur', () => { $('rfid-input').inputMode = 'none'; });
     $('complete-session').onclick = beginCompletion;
     $('cancel-completion').onclick = cancelCompletion; $('confirm-completion').onclick = complete;
     for (const button of document.querySelectorAll('[data-session-tab]')) {
