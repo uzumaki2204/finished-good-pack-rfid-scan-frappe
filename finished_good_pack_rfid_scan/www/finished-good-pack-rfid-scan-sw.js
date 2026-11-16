@@ -1,5 +1,5 @@
 /* Cache only this app shell. API data and IndexedDB are never touched. */
-const CACHE = 'finished-good-pack-rfid-scan-v31';
+const CACHE = 'finished-good-pack-rfid-scan-v32';
 const PAGE = '/finished-good-pack-rfid-scan';
 const fresh = url => fetch(url, {cache: 'no-store'});
 const assetUrl = value => {

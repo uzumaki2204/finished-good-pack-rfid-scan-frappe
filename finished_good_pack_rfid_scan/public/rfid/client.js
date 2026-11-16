@@ -11,6 +11,7 @@
   let focusedRfidKeyBurst = 0;
   let scanQueue = Promise.resolve();
   let scanMetrics = null, scanMetricFrame = null, manualScanScrollY = null;
+  let scanFocusTimer = null, scanPointerActive = false;
   const SESSION_TABS = ['po', 'items', 'boxes'];
   const BOX_FILTERS = ['not-scanned', 'scanning', 'completed'];
   const COMPLETION_LOCKED_CONTROLS = ['back-home', 'device-settings'];
@@ -45,6 +46,13 @@
     const x = window.scrollX, y = window.scrollY;
     input.focus({ preventScroll: true });
     if (window.scrollX !== x || window.scrollY !== y) window.scrollTo(x, y);
+  };
+  const queueRfidFocus = () => {
+    if (!canFocusRfid() || scanFocusTimer !== null) return;
+    scanFocusTimer = window.setTimeout(() => {
+      scanFocusTimer = null;
+      if (!scanPointerActive) focusRfidInput();
+    }, 0);
   };
   const positionScanDock = () => {
     const viewport = window.visualViewport;
@@ -478,6 +486,8 @@
   };
   const resetSessionNavigation = () => {
     closeItemDetail();
+    if (scanFocusTimer !== null) window.clearTimeout(scanFocusTimer);
+    scanFocusTimer = null; scanPointerActive = false;
     state.renderedSessionId = null; state.activeSessionTab = 'po'; state.activeBoxFilter = 'not-scanned';
     state.boxSearch = ''; state.sessionRows = null; state.completing = false; state.completionProgress = null;
     scanMetrics = null;
@@ -670,8 +680,7 @@
           scheduleScanMetrics();
         }
       }
-      const active = document.activeElement;
-      if (focusAfter || !active || !(active.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName))) focusRfidInput();
+      if (focusAfter || document.activeElement !== input) focusRfidInput();
     } catch { notice('error.offline_storage', 'danger'); }
   };
   const canCaptureScans = () => !state.session?.readOnly && state.session?.sessionStatus === 'Active' && !state.completing && !state.completionPending && !state.scanPaused && !state.refreshing
@@ -708,6 +717,7 @@
     const sessionId = state.session.sessionId;
     input.value = '';
     void enqueueScan(rfid, focusAfter, sessionId);
+    if (focusAfter) queueRfidFocus();
   };
   const resetScannerBuffer = () => {
     clearScannerCommitTimer(); resetFocusedRfidKeyBurst();
@@ -717,7 +727,7 @@
     clearScannerCommitTimer();
     scannerCommitTimer = window.setTimeout(() => {
       scannerCommitTimer = null;
-      commitScannerInput();
+      commitScannerInput(true);
     }, SCAN_COMMIT_DELAY_MS);
   };
   const appendScannerText = chunk => {
@@ -727,20 +737,18 @@
     const parts = raw.split(/[\r\n\t]/);
     for (let i = 0; i < parts.length; i++) {
       if (parts[i]) $('rfid-input').value = `${$('rfid-input').value || ''}${parts[i]}`;
-      if (i < parts.length - 1) commitScannerInput();
+      if (i < parts.length - 1) commitScannerInput(true);
     }
     if (parts[parts.length - 1]) queueScannerCommit();
   };
   const shouldCaptureScannerKeys = event => {
-    if (!canCaptureScans() || event.target === $('rfid-input')) return false;
-    const target = event.target;
-    if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return false;
-    return true;
+    return canCaptureScans() && event.target !== $('rfid-input');
   };
   const handleScannerKeyDown = event => {
     if (event.target === $('rfid-input')) {
-      if ((event.key === 'Enter' || event.key === 'Tab') && normalizedRfid(event.target.value)) {
-        event.preventDefault(); event.stopPropagation(); commitScannerInput(true);
+      if (!canCaptureScans()) return;
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault(); event.stopPropagation(); commitScannerInput(true); queueRfidFocus();
       } else if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing) {
         const now = performance.now();
         focusedRfidKeyBurst = now - lastFocusedRfidKeyAt <= SCAN_COMMIT_DELAY_MS ? focusedRfidKeyBurst + 1 : 1;
@@ -754,8 +762,7 @@
     if (!shouldCaptureScannerKeys(event)) return;
     const input = $('rfid-input');
     if (event.key === 'Enter' || event.key === 'Tab') {
-      if (!normalizedRfid(input.value)) return;
-      event.preventDefault(); event.stopPropagation(); commitScannerInput(); return;
+      event.preventDefault(); event.stopPropagation(); commitScannerInput(true); queueRfidFocus(); return;
     }
     if (event.key === 'Backspace') {
       if (!input.value) return;
@@ -767,10 +774,11 @@
   const handleScannerBeforeInput = event => {
     if (!canCaptureScans()) return;
     const text = typeof event.data === 'string' ? event.data : '';
+    if (event.inputType === 'insertLineBreak') {
+      event.preventDefault(); event.stopPropagation(); commitScannerInput(true); queueRfidFocus(); return;
+    }
     if (event.target === $('rfid-input')) {
-      if (event.inputType === 'insertLineBreak') {
-        event.preventDefault(); commitScannerInput(true);
-      } else if (text && /[\r\n\t]/.test(text)) {
+      if (text && /[\r\n\t]/.test(text)) {
         event.preventDefault(); appendScannerText(text);
       }
       return;
@@ -952,6 +960,7 @@
     $('toggle-scan').textContent = i18n.text(state.scanPaused ? 'ui.resume_scan' : 'ui.pause_scan');
     $('toggle-scan').setAttribute('aria-pressed', String(state.scanPaused));
     $('rfid-input').disabled = state.scanPaused || state.refreshing;
+    $('box-search').disabled = state.session?.sessionStatus === 'Active' && !state.session?.readOnly && !state.scanPaused;
   };
   const hasCartonMismatch = booking => Number(booking.headerPlannedCartonCount || 0) > 0
     && Number(booking.headerActualCartonCount || 0) !== Number(booking.headerPlannedCartonCount);
@@ -1026,7 +1035,8 @@
     window.visualViewport?.addEventListener('resize', onScanViewportResize);
     window.visualViewport?.addEventListener('scroll', positionScanDock);
     positionScanDock();
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) focusRfidInput(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) queueRfidFocus(); });
+    window.addEventListener('focus', () => { scanPointerActive = false; queueRfidFocus(); });
     window.setInterval(() => {
       if (!navigator.onLine || document.hidden || $('session-view').hidden
           || state.session?.readOnly || state.session?.sessionStatus !== 'Active' || state.refreshing || state.refreshRequest
@@ -1089,11 +1099,18 @@
     document.addEventListener('keydown', handleScannerKeyDown);
     document.addEventListener('beforeinput', handleScannerBeforeInput);
     document.addEventListener('paste', handleScannerPaste);
+    document.addEventListener('pointerdown', event => {
+      if (canFocusRfid() && event.target !== $('rfid-input')) scanPointerActive = true;
+    }, true);
+    const releaseScanPointer = () => { scanPointerActive = false; queueRfidFocus(); };
+    document.addEventListener('pointerup', releaseScanPointer, true);
+    document.addEventListener('pointercancel', releaseScanPointer, true);
+    document.addEventListener('focusin', event => { if (event.target !== $('rfid-input')) queueRfidFocus(); });
     // A deliberate tap permits manual entry; automatic hardware focus keeps the keyboard hidden.
     $('rfid-input').addEventListener('pointerdown', () => { manualScanScrollY = window.scrollY; $('rfid-input').inputMode = 'text'; });
-    $('rfid-input').addEventListener('blur', event => {
+    $('rfid-input').addEventListener('blur', () => {
       $('rfid-input').inputMode = 'none'; manualScanScrollY = null;
-      if (!event.relatedTarget || event.relatedTarget === document.body) window.setTimeout(focusRfidInput, 0);
+      queueRfidFocus();
     });
     $('complete-session').onclick = beginCompletion;
     $('cancel-completion').onclick = cancelCompletion; $('confirm-completion').onclick = complete;

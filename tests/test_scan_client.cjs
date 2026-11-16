@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync('finished_good_pack_rfid_scan/public/rfid/client.js','utf8');
-const code='let scanMetrics=null,scanMetricFrame=null,manualScanScrollY=null;'
+const code='let scanMetrics=null,scanMetricFrame=null,manualScanScrollY=null,scanFocusTimer=null,scanPointerActive=false;'
  +source.slice(source.indexOf('  const boxKey ='),source.indexOf('  const renderCompletionProgress ='))
  +source.slice(source.indexOf('  let scanLookupSession ='),source.indexOf('  const clearScannerCommitTimer ='))
  +'\nglobalThis.enqueue=enqueueScan;globalThis.setMetrics=value=>{scanMetrics=value;};';
@@ -63,9 +63,24 @@ function setup(){
  ctx.$=id=>{if(!scanElements.has(id))scanElements.set(id,{value:'',hidden:id==='item-detail-modal',open:false,focus(){ctx.document.activeElement=this;}});return scanElements.get(id);};
  ctx.document.activeElement=ctx.$('rfid-input');
  ctx.window.clearTimeout=()=>{};ctx.HTMLElement=class HTMLElement{};
- vm.runInContext('let scannerCommitTimer=null,lastFocusedRfidKeyAt=0,focusedRfidKeyBurst=0;const SCAN_COMMIT_DELAY_MS=60;'+source.slice(source.indexOf('  const clearScannerCommitTimer ='),source.indexOf('  const beginCompletion ='))+'\nglobalThis.scannerKey=handleScannerKeyDown;',ctx);
+ vm.runInContext('let scannerCommitTimer=null,lastFocusedRfidKeyAt=0,focusedRfidKeyBurst=0;const SCAN_COMMIT_DELAY_MS=60;'+source.slice(source.indexOf('  const clearScannerCommitTimer ='),source.indexOf('  const beginCompletion ='))+'\nglobalThis.scannerKey=handleScannerKeyDown;globalThis.scannerBeforeInput=handleScannerBeforeInput;globalThis.queueCommit=queueScannerCommit;',ctx);
  for(const key of 'ABC123')ctx.scannerKey({target:{},key,ctrlKey:false,altKey:false,metaKey:false,isComposing:false,preventDefault(){},stopPropagation(){}});
  ctx.scannerKey({target:{},key:'Enter',preventDefault(){},stopPropagation(){}});
  await ctx.scanQueue;assert.equal(scans.length,1);assert.equal(ctx.$('rfid-input').value,'');
+ ({ctx,scans}=setup());const input=ctx.$('rfid-input');const other=ctx.$('box-search');
+ ctx.window.clearTimeout=()=>{};
+ vm.runInContext('let scannerCommitTimer=null,lastFocusedRfidKeyAt=0,focusedRfidKeyBurst=0;const SCAN_COMMIT_DELAY_MS=60;'+source.slice(source.indexOf('  const clearScannerCommitTimer ='),source.indexOf('  const beginCompletion ='))+'\nglobalThis.scannerKey=handleScannerKeyDown;globalThis.scannerBeforeInput=handleScannerBeforeInput;globalThis.queueCommit=queueScannerCommit;',ctx);
+ ctx.queueCommit();input.value='ABC123';await ctx.flush();await ctx.scanQueue;
+ let prevented=false;ctx.scannerKey({target:input,key:'Tab',preventDefault(){prevented=true;},stopPropagation(){}});
+ assert.equal(prevented,true);assert.equal(ctx.document.activeElement,input);assert.equal(scans.length,1);
+ ctx.state.session.preloadedBookings=[{bookingId:'B',items:[...ctx.state.session.preloadedBookings[0].items,{finishedGoodPackDetailId:'I2',rfid:'DEF456'}]}];
+ ctx.document.activeElement=other;
+ for(const key of 'DEF456')ctx.scannerKey({target:other,key,ctrlKey:false,altKey:false,metaKey:false,isComposing:false,preventDefault(){},stopPropagation(){}});
+ ctx.scannerKey({target:other,key:'Enter',preventDefault(){},stopPropagation(){}});
+ await ctx.scanQueue;assert.equal(scans.length,2);assert.equal(other.value,'');
+ ctx.state.session.preloadedBookings=[{bookingId:'B',items:[...ctx.state.session.preloadedBookings[0].items,{finishedGoodPackDetailId:'I3',rfid:'XYZ789'}]}];
+ let beforePrevented=false;
+ ctx.scannerBeforeInput({target:other,inputType:'insertText',data:'XYZ789\n',preventDefault(){beforePrevented=true;},stopPropagation(){}});
+ await ctx.scanQueue;assert.equal(beforePrevented,true);assert.equal(scans.length,3);assert.equal(other.value,'');
  console.log('Client scan queue: valid scan, duplicate, unknown RFID, completion guard and storage failure passed');
 })().catch(e=>{console.error(e);process.exit(1)});
