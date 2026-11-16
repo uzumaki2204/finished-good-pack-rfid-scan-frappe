@@ -1,9 +1,11 @@
 /* All overrides are scoped to the RFID tablet, leaving Desk unchanged. */
+html.rfid-scan-page,html.rfid-scan-page body { overscroll-behavior-y:none; }
 #rfid-app { --rfid-bg:#fff; --rfid-surface:#f3f6fa; --rfid-line:#e5e9ef; --rfid-text:#172633; --rfid-muted:#7a8793; color:var(--rfid-text); background:linear-gradient(135deg,#edf2f7,#e1f1f7 55%,#eeebf8); min-height:100dvh; padding:0!important; font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:14px; }
 #rfid-app.rfid-dark { --rfid-bg:#18232e; --rfid-surface:#202e3b; --rfid-line:#344452; --rfid-text:#edf4fa; --rfid-muted:#a6b7c6; background:#101a24; color-scheme:dark; }
 #rfid-app [hidden] { display:none!important; }
 #rfid-app > .row { margin:0; }
 #rfid-app > .row > div { width:100%; max-width:480px; flex:0 1 480px; padding:0; min-height:100dvh; background:var(--rfid-bg); }
+@supports (min-height:100svh) { #rfid-app,#rfid-app > .row > div { min-height:100svh; } }
 #rfid-app header { min-height:61px; padding:9px 12px; margin:0!important; border-bottom:1px solid var(--rfid-line); background:var(--rfid-surface); gap:8px; }
 #rfid-app header > div:first-child { min-width:0; }
 #rfid-app header img { width:40px; height:40px; object-fit:contain; }

@@ -1,10 +1,17 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync('finished_good_pack_rfid_scan/public/rfid/client.js','utf8');
-const code=source.slice(source.indexOf('  let scanLookupSession ='),source.indexOf('  const clearScannerCommitTimer ='))+'\nglobalThis.enqueue=enqueueScan;';
+const code='let scanMetrics=null,scanMetricFrame=null,manualScanScrollY=null;'
+ +source.slice(source.indexOf('  const boxKey ='),source.indexOf('  const renderCompletionProgress ='))
+ +source.slice(source.indexOf('  let scanLookupSession ='),source.indexOf('  const clearScannerCommitTimer ='))
+ +'\nglobalThis.enqueue=enqueueScan;globalThis.setMetrics=value=>{scanMetrics=value;};';
 function setup(){
- const scans=[],notices=[],timers=[];
- const ctx={window:{setTimeout:fn=>{timers.push(fn);return timers.length;}},state:{session:{sessionId:'S',sessionStatus:'Active',preloadedBookings:[{bookingId:'B',items:[{finishedGoodPackDetailId:'I',rfid:'ABC123',orderNo:'PO',doNo:'DO',dispPackNum:'0001'}]}]}},scanQueue:Promise.resolve(),normalizedRfid:v=>String(v||'').trim().toUpperCase(),scansForSession:async()=>scans.map(x=>x.payload),store:{put:async(t,row)=>scans.push(row)},notice:k=>notices.push(k),renderSession:async()=>{},$:()=>({value:'',focus(){}}),Date};
- vm.createContext(ctx);vm.runInContext(code,ctx);ctx.flush=async()=>{while(timers.length)await timers.shift()();};return {ctx,scans,notices};
+ const scans=[],notices=[],timers=[],frames=[],elements=new Map();
+ const ctx={window:{setTimeout:fn=>{timers.push(fn);return timers.length;},requestAnimationFrame:fn=>{frames.push(fn);return frames.length;},scrollX:0,scrollY:0,scrollTo(){}},state:{session:{sessionId:'S',sessionStatus:'Active',preloadedBookings:[{bookingId:'B',items:[{finishedGoodPackDetailId:'I',rfid:'ABC123',orderNo:'PO',doNo:'DO',dispPackNum:'0001',isMetalCheck:'Y'}]}]}},scanQueue:Promise.resolve(),normalizedRfid:v=>String(v||'').trim().toUpperCase(),normalized:v=>String(v||'').toUpperCase(),formatCount:v=>String(v),scansForSession:async()=>scans.map(x=>x.payload),store:{put:async(t,row)=>scans.push(row)},notice:k=>notices.push(k),renderSession:async()=>{throw Error('A scan must not redraw the session');},$:id=>{if(!elements.has(id))elements.set(id,{value:'',hidden:id==='item-detail-modal',open:false,focus(){ctx.document.activeElement=this;}});return elements.get(id);},Date};
+ ctx.document={hidden:false,body:{},activeElement:null};
+ vm.createContext(ctx);vm.runInContext(code,ctx);
+ ctx.document.activeElement=ctx.$('rfid-input');
+ ctx.setMetrics({session:ctx.state.session,scanned:0,metal:0,completedBoxes:0,totalBoxes:1,countedIds:new Set(),boxes:new Map([['["B","PO","DO","0001"]',{total:1,scanned:0}]])});
+ ctx.flush=async()=>{while(timers.length)await timers.shift()();};ctx.flushFrames=()=>{while(frames.length)frames.shift()();};return {ctx,scans,notices};
 }
 (async()=>{
  let {ctx,scans,notices}=setup();
@@ -14,9 +21,13 @@ function setup(){
  ctx.state.completing=false;ctx.state.session.sessionStatus='Completed';await ctx.enqueue('ABC123');assert.equal(scans.length,1);
  ({ctx,scans,notices}=setup());ctx.store.put=async()=>{throw Error('disk full')};await ctx.enqueue('ABC123');assert.equal(scans.length,0);assert.equal(notices.at(-1),'error.offline_storage');
  ({ctx,scans,notices}=setup());ctx.state.session.readOnly=true;await ctx.enqueue('ABC123');assert.equal(scans.length,0);
- ({ctx,scans,notices}=setup());let renders=0;ctx.renderSession=async()=>renders++;
+ ({ctx,scans,notices}=setup());
  await Promise.all(Array.from({length:300},(_,i)=>ctx.enqueue(i%3 ? 'OUTSIDE-'+i : 'ABC123')));
- assert.equal(scans.length,1);assert.equal(renders,0);await ctx.flush();assert.equal(renders,1);assert.equal(notices.length,0);
+ assert.equal(scans.length,1);assert.equal(ctx.$('metric-scanned').textContent,undefined);ctx.flushFrames();
+ assert.equal(ctx.$('metric-scanned').textContent,'1');assert.equal(ctx.$('metric-metal').textContent,'1');
+ assert.equal(ctx.$('metric-boxes').textContent,'1/1');assert.equal(notices.length,0);
+ ({ctx,scans}=setup());ctx.document.activeElement={tagName:'BUTTON'};
+ await ctx.enqueue('ABC123');assert.equal(ctx.document.activeElement,ctx.$('rfid-input'));
  ({ctx,scans,notices}=setup());ctx.state.session.preloadedBookings[0].items.push({...ctx.state.session.preloadedBookings[0].items[0],finishedGoodPackDetailId:'I2'});
  await ctx.enqueue('ABC123');assert.equal(scans.length,0);assert.equal(notices.at(-1),'error.scan_ambiguous_in_plan');
  ({ctx,scans,notices}=setup());
@@ -40,7 +51,8 @@ function setup(){
  await ctx.enqueue('ABC123');ctx.store.put=put;await ctx.enqueue('ABC123');assert.equal(scans.length,1);
  // Split batched scanner input rather than concatenating separate RFID values.
  ({ctx,scans,notices}=setup());const elements=new Map();
- ctx.$=id=>{if(!elements.has(id))elements.set(id,{value:'',hidden:id==='item-detail-modal',open:false});return elements.get(id);};
+ ctx.$=id=>{if(!elements.has(id))elements.set(id,{value:'',hidden:id==='item-detail-modal',open:false,focus(){ctx.document.activeElement=this;}});return elements.get(id);};
+ ctx.document.activeElement=ctx.$('rfid-input');
  ctx.window.clearTimeout=()=>{};ctx.scannerCommitTimer=null;ctx.lastFocusedRfidKeyAt=0;ctx.focusedRfidKeyBurst=0;ctx.SCAN_COMMIT_DELAY_MS=60;
  vm.runInContext(source.slice(source.indexOf('  const clearScannerCommitTimer ='),source.indexOf('  const shouldCaptureScannerKeys ='))+'\nglobalThis.append=appendScannerText;',ctx);
  ctx.append('OUTSIDE\r\nABC123\tOUTSIDE2\nABC123\n');await ctx.scanQueue;
@@ -48,7 +60,8 @@ function setup(){
  // A hardware scanner must work while a non-editable page element has focus.
  assert.match(fs.readFileSync('finished_good_pack_rfid_scan/web_page.html','utf8'),/id="rfid-input"[^>]*inputmode="none"/);
  ({ctx,scans,notices}=setup());const scanElements=new Map();
- ctx.$=id=>{if(!scanElements.has(id))scanElements.set(id,{value:'',hidden:id==='item-detail-modal',open:false});return scanElements.get(id);};
+ ctx.$=id=>{if(!scanElements.has(id))scanElements.set(id,{value:'',hidden:id==='item-detail-modal',open:false,focus(){ctx.document.activeElement=this;}});return scanElements.get(id);};
+ ctx.document.activeElement=ctx.$('rfid-input');
  ctx.window.clearTimeout=()=>{};ctx.HTMLElement=class HTMLElement{};
  vm.runInContext('let scannerCommitTimer=null,lastFocusedRfidKeyAt=0,focusedRfidKeyBurst=0;const SCAN_COMMIT_DELAY_MS=60;'+source.slice(source.indexOf('  const clearScannerCommitTimer ='),source.indexOf('  const beginCompletion ='))+'\nglobalThis.scannerKey=handleScannerKeyDown;',ctx);
  for(const key of 'ABC123')ctx.scannerKey({target:{},key,ctrlKey:false,altKey:false,metaKey:false,isComposing:false,preventDefault(){},stopPropagation(){}});
