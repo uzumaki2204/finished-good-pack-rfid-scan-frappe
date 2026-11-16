@@ -170,6 +170,29 @@
     });
   };
   const boxStatus = row => row.scanned === 0 ? 'not-scanned' : row.scanned < row.total ? 'scanning' : 'completed';
+  const renderBoxLabel = row => {
+    const label = document.createElement('div');
+    label.className = 'rfid-box-label';
+    const number = document.createElement('span');
+    number.textContent = row.label || i18n.text('ui.not_available');
+    label.append(number);
+    if (row.noRfid) {
+      const note = document.createElement('span');
+      note.className = 'rfid-box-no-rfid-note';
+      note.textContent = i18n.text('ui.box_no_rfid');
+      const help = document.createElement('details');
+      help.className = 'rfid-box-retention-help';
+      const summary = document.createElement('summary');
+      summary.textContent = 'ⓘ';
+      summary.setAttribute('aria-label', i18n.text('ui.rfid_retention_help'));
+      const retention = document.createElement('span');
+      retention.className = 'rfid-box-retention-note';
+      retention.textContent = i18n.text('ui.rfid_retention_note');
+      help.append(summary, retention);
+      label.append(note, help);
+    }
+    return label;
+  };
   const renderBoxList = () => {
     for (const button of document.querySelectorAll('[data-box-filter]')) {
       const active = button.dataset.boxFilter === state.activeBoxFilter;
@@ -179,8 +202,10 @@
     }
     const rows = (state.sessionRows?.boxes || []).filter(row => boxStatus(row) === state.activeBoxFilter
       && (!state.boxScope || (row.bookingId === state.boxScope.bookingId && row.orderNo === state.boxScope.orderNo))
-      && String(row.label || '').toLocaleLowerCase().includes(state.boxSearch));
-    table('box-list', [['ui.boxes', row => row.label || i18n.text('ui.not_available')], ['ui.scanned', row => row.progress]], rows);
+      && String(row.label || '').toLocaleLowerCase().includes(state.boxSearch))
+      .sort((a, b) => Number(Boolean(a.noRfid)) - Number(Boolean(b.noRfid))
+        || String(a.label || '').localeCompare(String(b.label || ''), undefined, { numeric: true, sensitivity: 'base' }));
+    table('box-list', [['ui.boxes', renderBoxLabel], ['ui.scanned', row => row.progress]], rows);
   };
   const itemProgress = row => `${formatCount(row.scanned)}/${formatCount(row.total)}`;
   const bookingTargetBoxes = booking => Math.max(
@@ -415,6 +440,26 @@
         } else if (variant.qtyPerSet !== Number(item.qtyPerSet || 0)) variant.qtyPerSet = 0;
         variant.total += 1; variant.scanned += Number(found);
       }
+      for (const box of booking.noRfidBoxes || []) {
+        const itemBoxKey = boxKey(bookingId, box);
+        boxes.set(itemBoxKey, {
+          label: box.dispPackNum || box.usedPackNum || '', bookingId, orderNo: box.orderNo || '',
+          total: 0, scanned: 0, noRfid: true,
+        });
+        const poKey = JSON.stringify([bookingId, box.orderNo || '']);
+        if (!poBoxKeys.has(poKey)) poBoxKeys.set(poKey, new Set());
+        poBoxKeys.get(poKey).add(itemBoxKey);
+        if (!po.has(poKey)) po.set(poKey, { label: box.orderNo || '', bookingId, orderNo: box.orderNo || '', total: 0, scanned: 0 });
+        const itemCode = box.sampleCode || box.itemCode || '';
+        const itemKey = JSON.stringify([bookingId, box.orderNo || '', itemCode]);
+        let itemRow = items.get(itemKey);
+        if (!itemRow) {
+          itemRow = { label: itemCode, bookingId, orderNo: box.orderNo || '', total: 0, scanned: 0,
+            boxKeys: new Set(), variantKeys: new Set(), markets: new Map(), qtyPerSetValues: new Set(), pendingBoxes: 0, pendingItems: 0 };
+          items.set(itemKey, itemRow);
+        }
+        itemRow.pendingBoxes += 1;
+      }
     }
     const mappedBoxCounts = new Map();
     for (const signature of boxes.keys()) {
@@ -459,16 +504,23 @@
       totalBoxes: actualBoxTotal, countedIds: scannedIds,
       boxes: new Map([...boxes].map(([key, row]) => [key, { total: row.total, scanned: row.scanned }])) };
     renderScanMetrics();
-    const progress = rows => [...rows.values()].map(row => ({ ...row, progress: `${row.scanned}/${row.total}` }));
+    const progress = rows => [...rows.values()].map(row => ({ ...row,
+      progress: row.noRfid ? i18n.text('ui.no_rfid_progress') : `${row.scanned}/${row.total}` }));
     const poRows = [...po.entries()].map(([signature, row]) => {
       const boxKeys = poBoxKeys.get(signature) || new Set();
-      const completed = [...boxKeys].filter(key => boxes.get(key)?.scanned === boxes.get(key)?.total).length;
+      const completed = [...boxKeys].filter(key => {
+        const box = boxes.get(key);
+        return box?.total > 0 && box.scanned >= box.total;
+      }).length;
       return { label: row.label, bookingId: row.bookingId, progress: `${completed}/${boxKeys.size + (poPendingBoxes.get(signature) || 0)}` };
     });
     const itemRows = [...items.values()].map(row => ({
       label: row.label, bookingId: row.bookingId, orderNo: row.orderNo, total: row.total, scanned: row.scanned,
       boxCount: row.boxKeys.size + row.pendingBoxes, pendingBoxes: row.pendingBoxes, pendingItems: row.pendingItems,
-      completedBoxes: [...row.boxKeys].filter(key => boxes.get(key)?.scanned === boxes.get(key)?.total).length,
+      completedBoxes: [...row.boxKeys].filter(key => {
+        const box = boxes.get(key);
+        return box?.total > 0 && box.scanned >= box.total;
+      }).length,
       variantCount: row.variantKeys.size,
       markets: [...row.markets.values()].map(market => ({
         code: market.code, name: market.name, total: market.total, scanned: market.scanned,

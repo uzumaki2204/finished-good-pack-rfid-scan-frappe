@@ -149,3 +149,13 @@ html.rfid-scan-page,html.rfid-scan-page body { overscroll-behavior-y:none; }
 #rfid-app .rfid-photo-upload small { display:block; margin:5px 0; }
 #rfid-app #photo-viewer { max-width:95vw; max-height:95dvh; padding:10px; border:0; border-radius:12px; background:var(--rfid-bg); }
 #rfid-app #photo-full { display:block; max-width:85vw; max-height:78dvh; object-fit:contain; margin-top:8px; }
+#rfid-app .rfid-box-label { display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px; }
+#rfid-app .rfid-box-no-rfid-note { display:inline-flex; align-items:center; border-radius:999px; padding:3px 8px; background:#fff3d6; color:#805900; font-size:11px; font-weight:650; line-height:1.35; }
+#rfid-app .rfid-box-retention-help { display:inline-flex; align-items:center; }
+#rfid-app .rfid-box-retention-help[open] { display:flex; flex-basis:100%; flex-wrap:wrap; }
+#rfid-app .rfid-box-retention-help summary { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border:1px solid var(--rfid-line); border-radius:50%; color:var(--rfid-muted); cursor:pointer; font-size:13px; font-weight:700; list-style:none; }
+#rfid-app .rfid-box-retention-help summary::-webkit-details-marker { display:none; }
+#rfid-app .rfid-box-retention-help summary::marker { content:""; }
+#rfid-app .rfid-box-retention-help summary:focus-visible { outline:3px solid #25a6d7; outline-offset:2px; }
+#rfid-app .rfid-box-retention-note { display:block; flex-basis:100%; width:100%; padding-top:4px; color:var(--rfid-muted); font-size:12px; line-height:1.45; }
+#rfid-app.rfid-dark .rfid-box-no-rfid-note { background:#4d3e1d; color:#ffe29b; }

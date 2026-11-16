@@ -68,6 +68,7 @@ def resolve_booking(company, booking, sources, packs, details_by_pack, market_lo
             candidate_boxes[pack_key] = (pack, details_by_pack.get(text(pack.get("innerPackNum")), []))
 
     items = []
+    no_rfid_boxes = []
     unmapped = []
     claimed_boxes = set()
     for source in sorted(unique_sources.values(), key=lambda row: (_physical_key(row), key(row.get("setCode")))):
@@ -101,10 +102,24 @@ def resolve_booking(company, booking, sources, packs, details_by_pack, market_lo
         market_code = text(pack.get("sampleCode"))[:2]
         market = market_lookup(market_code) or {}
         booking_detail_id = stable_uuid(company, "booking-detail", booking_id, source.get("innerContainerId"), source.get("usedPackNum"))
-        for detail in details:
-            rfid = clean_rfid(detail.get("rfid"))
-            if not rfid:
-                continue
+        rfid_details = [(detail, clean_rfid(detail.get("rfid"))) for detail in details]
+        rfid_details = [(detail, rfid) for detail, rfid in rfid_details if rfid]
+        if not rfid_details:
+            no_rfid_boxes.append({
+                "bookingDetailId": booking_detail_id,
+                "innerContainerId": text(source.get("innerContainerId")),
+                "dispContainerId": text(source.get("dispContainerId")),
+                "orderNo": text(source.get("orderNo")),
+                "doNo": text(source.get("doNo")),
+                "sampleCode": text(pack.get("sampleCode")) or text(source.get("sampleCode")),
+                "usedPackNum": text(source.get("usedPackNum")),
+                "dispPackNum": text(pack.get("dispPackNum")) or text(source.get("usedPackNum")),
+                "itemCode": text(pack.get("itemCode")),
+                "qtyPerSet": int(pack.get("qtyPerSet") or 0),
+                "reason": "no_rfid",
+            })
+            continue
+        for detail, rfid in rfid_details:
             detail_id = stable_uuid(company, "pack-detail", pack.get("innerPackNum"), pack.get("orderNo"), pack.get("doNo"), rfid, detail.get("skuCode"), detail.get("colorCode"), detail.get("sizeCode"))
             items.append({
                 "bookingDetailId": booking_detail_id,
@@ -135,7 +150,7 @@ def resolve_booking(company, booking, sources, packs, details_by_pack, market_lo
                 "isMetalCheck": text(detail.get("isMetalCheck")),
             })
 
-    if not items:
+    if not items and not no_rfid_boxes:
         raise RfidError("error.booking_unmapped", booking_id=booking_id)
     now = datetime.now(timezone.utc)
     summary = defaultdict(lambda: {"boxCount": 0, "dispPackNums": set()})
@@ -174,12 +189,14 @@ def resolve_booking(company, booking, sources, packs, details_by_pack, market_lo
         "plannedBoxCount": len(unique_sources),
         "mappedBoxCount": len(claimed_boxes),
         "unmappedBoxCount": len(unmapped),
+        "noRfidBoxCount": len(no_rfid_boxes),
         "hasPlanningMismatch": bool(warnings),
         "planningWarnings": warnings,
         "missingContainerIds": [row["innerContainerId"] for row in unmapped],
-        "orderNos": sorted({item["orderNo"] for item in items if item["orderNo"]}),
+        "orderNos": sorted({text(row.get("orderNo")) for row in [*items, *no_rfid_boxes] if text(row.get("orderNo"))}),
         "summaryRows": summary_rows,
         "unmappedBoxGroups": unmapped,
+        "noRfidBoxes": sorted(no_rfid_boxes, key=lambda box: (box["orderNo"], box["dispPackNum"])),
         "items": sorted(items, key=lambda item: (item["orderNo"], item["dispPackNum"], item["rfid"])),
     }
     payload["planVersion"] = snapshot_version(payload)
@@ -237,8 +254,14 @@ def validate_scans(scans, bookings):
 def booking_delta(old, new):
     old_items = {item["finishedGoodPackDetailId"] for item in (old or {}).get("items", [])}
     new_items = {item["finishedGoodPackDetailId"] for item in new.get("items", [])}
-    old_boxes = {(item["orderNo"], item.get("doNo"), item["dispPackNum"]) for item in (old or {}).get("items", [])}
-    new_boxes = {(item["orderNo"], item.get("doNo"), item["dispPackNum"]) for item in new.get("items", [])}
+    old_boxes = {
+        (box["orderNo"], box.get("doNo"), box.get("dispPackNum") or box.get("usedPackNum"))
+        for box in [*(old or {}).get("items", []), *(old or {}).get("noRfidBoxes", [])]
+    }
+    new_boxes = {
+        (box["orderNo"], box.get("doNo"), box.get("dispPackNum") or box.get("usedPackNum"))
+        for box in [*new.get("items", []), *new.get("noRfidBoxes", [])]
+    }
     added_items = len(new_items - old_items)
     removed_items = len(old_items - new_items)
     added_boxes = len(new_boxes - old_boxes)
