@@ -213,8 +213,6 @@ def validate_scans(scans, bookings):
                 lookup[(key(booking["bookingId"]), detail_id)] = (booking, item)
     if not isinstance(scans, list) or not scans:
         raise RfidError("error.scan_required")
-    if len(scans) > 10000:
-        raise RfidError("error.invalid_request")
     seen_details = set()
     seen_rfids = set()
     normalized = []
