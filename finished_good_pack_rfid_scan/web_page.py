@@ -59,6 +59,7 @@ def update_website_context(context):
     language = str(frappe.form_dict.get("lang") or "vi").split("-")[0]
     context.rfid_language = language if language in catalog() else "vi"
     context.rfid_catalog = catalog()
+    context.rfid_app_version = __version__
     context.rfid_asset_version = asset_version()
     head = frappe.get_template(
         "finished_good_pack_rfid_scan/templates/includes/tablet_head.html"

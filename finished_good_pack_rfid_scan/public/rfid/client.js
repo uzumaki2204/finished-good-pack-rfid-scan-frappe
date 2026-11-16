@@ -617,7 +617,8 @@
   const loadHome = async () => {
     if (!state.device) return views('device-view');
     views('home-view'); selectHomeTab(state.homeTab);
-    $('device-summary').textContent = `${state.device.deviceName} · ${state.device.companyName}`;
+    const pageVersion = window.FinishedGoodRfidVersion || i18n.text('ui.not_available');
+    $('device-summary').textContent = `${state.device.deviceName} · ${state.device.companyName} · ${i18n.text('ui.page_version')}: ${pageVersion}`;
     try {
       const [active, history, scanCounts] = await Promise.all([api('active'), api('history'), localScanCounts()]);
       sessionCards('active-list', active, 'ui.empty_sessions', true, scanCounts);
