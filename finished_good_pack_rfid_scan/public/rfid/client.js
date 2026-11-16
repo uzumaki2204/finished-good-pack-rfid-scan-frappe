@@ -606,7 +606,7 @@
         await store.put('meta', session.sessionId, 'currentSession');
       } catch { cacheReady = false; }
       const sessionRendered = await renderSession();
-      if (cacheReady && sessionRendered) notice('success.session_started', 'success');
+      if (cacheReady && sessionRendered) clearNotice();
       else notice('error.offline_storage', 'warning');
     } catch (error) { explain(error); }
     finally { button.disabled = false; button.textContent = i18n.text('ui.start'); }
@@ -652,6 +652,7 @@
       await store.put('scans', { key: `${sessionId}|${lookupRfid}`, sessionId, payload: scan });
       if (savedScanSession === session) savedRfids.add(lookupRfid);
       if (state.session?.sessionId !== sessionId) return;
+      clearNotice();
       const input = $('rfid-input');
       if (normalizedRfid(input.value) === lookupRfid) input.value = '';
       const metrics = scanMetrics;
@@ -1071,7 +1072,7 @@
     }
     renderBookings();
     $('refresh-active').onclick = loadHome; $('refresh-history').onclick = loadHome;
-    $('back-home').onclick = async () => { resetScannerBuffer(); state.session = null; resetSessionNavigation(); await store.remove('meta', 'currentSession'); await loadHome(); };
+    $('back-home').onclick = async () => { resetScannerBuffer(); state.session = null; resetSessionNavigation(); clearNotice(); await store.remove('meta', 'currentSession'); await loadHome(); };
     $('toggle-scan').onclick = async () => {
       resetScannerBuffer(); state.scanPaused = !state.scanPaused; renderScanMode();
       if (state.scanPaused) { await scanQueue; if (state.scanPaused && state.session?.sessionStatus === 'Active') await renderSession(); }
