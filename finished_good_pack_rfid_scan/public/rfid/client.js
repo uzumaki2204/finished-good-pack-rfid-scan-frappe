@@ -74,8 +74,8 @@
     if (!status) return;
     const progress = state.completionProgress;
     if (!progress) { status.hidden = true; status.textContent = ''; return; }
-    const messages = { uploading: 'ui.uploading_records', complete: 'ui.uploaded_records', failed: 'ui.upload_failed' };
-    const styles = { uploading: 'info', complete: 'success', failed: 'danger' };
+    const messages = { uploading: 'ui.uploading_records', finalizing: 'ui.finalizing_session', complete: 'ui.uploaded_records', failed: 'ui.upload_failed' };
+    const styles = { uploading: 'info', finalizing: 'info', complete: 'success', failed: 'danger' };
     status.className = `alert alert-${styles[progress.phase]} mb-3`;
     status.textContent = i18n.text(messages[progress.phase], {
       uploaded: formatCount(progress.uploaded), total: formatCount(progress.total),
@@ -919,6 +919,8 @@
         state.completionProgress = { phase: 'uploading', uploaded, total };
         renderCompletionProgress();
       }
+      state.completionProgress = { phase: 'finalizing', uploaded, total };
+      renderCompletionProgress();
       const session = await api('complete', { sessionId: state.session.sessionId, scans: [], compactResult: true,
         vehiclePlateNumber, driverFullName, note: value('completion-note') }, 'POST');
       uploaded = Number(session.totalScannedCount ?? scans.length);

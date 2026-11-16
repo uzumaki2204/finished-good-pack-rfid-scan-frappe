@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 
 import frappe
+from frappe.model.document import bulk_insert as frappe_bulk_insert
 
 from finished_good_pack_rfid_scan.access import approved_device, device_data
 from finished_good_pack_rfid_scan.errors import RfidError
@@ -179,8 +180,7 @@ def _card(session, bookings=None, scans=None):
         "orderNos": sorted(history_orders),
         "purchaseOrderCount": len(history_orders),
         "requiresOnlineCompletion": session.status == "Active",
-        "completionWarnings": ([message("warning.cross_session_duplicate", count=session.cross_session_duplicate_count)]
-                               if session.cross_session_duplicate_count else []),
+        "completionWarnings": [],
     }
 
 
@@ -449,11 +449,18 @@ def _scan_record(device, session_id, scan):
 
 def _insert_scans(device, session_id, scans):
     saved = {}
+    documents = []
     for scan in scans:
         record = _scan_record(device, session_id, scan)
-        name = frappe.get_doc(record).insert(ignore_permissions=True).name
+        record["name"] = record["scan_key"]
+        name = record["name"]
+        documents.append(frappe.get_doc(record))
         if record.get("storage_version") == 1:
             saved[name] = scan
+    if documents:
+        # API inputs have passed plan, ownership, and duplicate validation.
+        # Frappe's bulk helper writes these prepared documents without per-row hooks.
+        frappe_bulk_insert(SCAN, documents, chunk_size=500)
     if saved:
         rows = frappe.db.get_all(SCAN, filters={"name": ["in", list(saved)]},
                                  fields=["name", *scan_storage.READ_FIELDS], limit_page_length=0)
@@ -467,21 +474,8 @@ def _insert_scans(device, session_id, scans):
                 raise RfidError("error.scan_storage", reason=str(error)) from error
 
 
-def _duplicate_rfids(device, session_id, scans):
-    keys = sorted({rfid_key(scan["rfid"]) for scan in scans})
-    duplicates = set()
-    for offset in range(0, len(keys), 500):
-        rows = frappe.db.get_all(SCAN, filters={"company": device.company,
-            "session": ["!=", session_id], "normalized_rfid": ["in", keys[offset:offset + 500]]},
-            fields=["normalized_rfid"], limit_page_length=0)
-        duplicates.update(row.normalized_rfid for row in rows)
-    return len(duplicates)
-
-
 def _sync_batch(device, session, scans, bookings):
     resolved = validate_scans(scans, bookings)
-    # Keep inserts serialized with final cross-session duplicate counting.
-    frappe.db.sql("SELECT name FROM `tabCompany` WHERE name=%s FOR UPDATE", (device.company,))
     names = [_hash(session.name, scan["bookingId"], scan["finishedGoodPackDetailId"]) for scan in resolved]
     stored_rows = frappe.db.get_all(SCAN, filters={"name": ["in", names]},
                                     fields=["name", "rfid"], limit_page_length=0)
@@ -549,10 +543,7 @@ def complete(device_id, session_id, vehicle, driver, note, scans, _finalize=True
     resolved = validate_scans(list(merged.values()), bookings)
     frozen = {(x["bookingId"],x["finishedGoodPackDetailId"]):x for x in stored}
     resolved = [frozen.get((x["bookingId"],x["finishedGoodPackDetailId"]),x) for x in resolved]
-    # Serialize duplicate counting for sessions in the same company.
-    frappe.db.sql("SELECT name FROM `tabCompany` WHERE name=%s FOR UPDATE", (device.company,))
     stored_ids = {(x["bookingId"],x["finishedGoodPackDetailId"]) for x in stored}
-    duplicate_count = _duplicate_rfids(device, session_id, resolved)
     new = [scan for scan in resolved if (scan["bookingId"], scan["finishedGoodPackDetailId"]) not in stored_ids]
     _insert_scans(device, session_id, new)
     if _finalize:
@@ -563,7 +554,6 @@ def complete(device_id, session_id, vehicle, driver, note, scans, _finalize=True
         session.session_completed_at = _utc_db()
     session.total_scanned_count = len(resolved)
     session.metal_checked_count = sum(_metal(scan.get("isMetalCheck")) for scan in resolved)
-    session.cross_session_duplicate_count = duplicate_count
     session.completion_hash = _hash(_json(sorted(resolved, key=lambda row: row["finishedGoodPackDetailId"])))
     session.save(ignore_permissions=True)
     return _compact_completed(session) if compact else _details(session)
